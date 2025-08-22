@@ -22,6 +22,9 @@ import time
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
+import base64
+import io
 import tempfile
 import zipfile
 
@@ -213,6 +216,7 @@ class ChatMessage(BaseModel):
 class ChatExportRequest(BaseModel):
     title: str = "Chat Export"
     messages: List[ChatMessage]
+    cover_data_url: Optional[str] = None
 
 # Routes
 @app.get("/")
@@ -244,6 +248,21 @@ async def export_chat_pdf(payload: ChatExportRequest):
         c.setFont("Helvetica-Bold", 14)
         c.drawString(margin, y, payload.title)
         y -= 30
+        # Optional cover image below title
+        if payload.cover_data_url:
+            try:
+                header, b64 = payload.cover_data_url.split(',', 1)
+                img_bytes = base64.b64decode(b64)
+                img = ImageReader(io.BytesIO(img_bytes))
+                iw, ih = img.getSize()
+                max_w = width - 2 * margin
+                max_h = height / 3
+                scale = min(max_w / iw, max_h / ih)
+                draw_w, draw_h = iw * scale, ih * scale
+                c.drawImage(img, margin, y - draw_h, width=draw_w, height=draw_h, preserveAspectRatio=True, mask='auto')
+                y -= (draw_h + 20)
+            except Exception:
+                pass
         c.setFont("Helvetica", 11)
         for m in payload.messages:
             lines = [f"{m.role.capitalize()}: {line}" for line in m.content.split("\n")]
@@ -258,6 +277,27 @@ async def export_chat_pdf(payload: ChatExportRequest):
         c.save()
         filename = f"chat_export_{uuid.uuid4().hex[:8]}.pdf"
         return FileResponse(tmp_path, filename=filename, media_type="application/pdf")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/export/chat-html")
+async def export_chat_html(payload: ChatExportRequest):
+    try:
+        html = ["<html><head><meta charset='utf-8'><title>{}</title></head><body>".format(payload.title)]
+        html.append(f"<h1>{payload.title}</h1>")
+        for m in payload.messages:
+            role = (m.role or '').capitalize()
+            content = (m.content or '').replace('\n', '<br/>')
+            html.append(f"<p><strong>{role}:</strong> {content}</p>")
+        html.append("</body></html>")
+        content = "".join(html).encode('utf-8')
+        fd, tmp_path = tempfile.mkstemp(suffix=".html")
+        os.close(fd)
+        with open(tmp_path, 'wb') as f:
+            f.write(content)
+        filename = f"chat_export_{uuid.uuid4().hex[:8]}.html"
+        return FileResponse(tmp_path, filename=filename, media_type="text/html; charset=utf-8")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

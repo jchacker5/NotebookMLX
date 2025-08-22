@@ -1,10 +1,14 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { X, Download, FileText, Mic, Video } from 'lucide-react'
 import { useStore } from '../store/useStore'
-import { exportChatPdf } from '../services/api'
+import { exportChatPdf, exportChatHtml } from '../services/api'
+import { useToast } from './Toast'
 
 export function ExportModal({ onClose }: { onClose: () => void }) {
   const { messages, podcastTask } = useStore()
+  const { notify } = useToast()
+  const [title, setTitle] = useState('Chat Export')
+  const [coverDataUrl, setCoverDataUrl] = useState<string | undefined>(undefined)
 
   const chatForExport = useMemo(
     () => messages.map((m) => ({ role: m.role, content: m.content })),
@@ -12,13 +16,25 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
   )
 
   const handleExportChatPdf = async () => {
-    const blob = await exportChatPdf('Chat Export', chatForExport)
+    const blob = await exportChatPdf(title || 'Chat Export', chatForExport, coverDataUrl)
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'chat_export.pdf'
+    a.download = `${(title || 'chat_export').replace(/\s+/g, '_').toLowerCase()}.pdf`
     a.click()
     URL.revokeObjectURL(url)
+    notify('Chat PDF exported')
+  }
+
+  const handleExportChatHtml = async () => {
+    const blob = await exportChatHtml(title || 'Chat Export', chatForExport)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${(title || 'chat_export').replace(/\s+/g, '_').toLowerCase()}.html`
+    a.click()
+    URL.revokeObjectURL(url)
+    notify('Chat HTML exported')
   }
 
   const audioHref = podcastTask?.task_id
@@ -41,11 +57,39 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <div className="p-4 space-y-4">
+          <div className="space-y-2">
+            <label className="block text-sm font-medium">Title</label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Chat Export"
+              className="w-full px-3 py-2 border rounded"
+            />
+            <label className="block text-sm font-medium mt-2">Optional cover image</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) {
+                  const reader = new FileReader()
+                  reader.onload = () => setCoverDataUrl(reader.result as string)
+                  reader.readAsDataURL(f)
+                }
+              }}
+            />
+          </div>
           <button
             onClick={handleExportChatPdf}
             className="w-full flex items-center gap-3 p-3 border rounded hover:bg-black/5"
           >
             <FileText className="w-5 h-5" /> Export chat as PDF
+          </button>
+          <button
+            onClick={handleExportChatHtml}
+            className="w-full flex items-center gap-3 p-3 border rounded hover:bg-black/5"
+          >
+            <FileText className="w-5 h-5" /> Export chat as HTML
           </button>
 
           <div className="grid grid-cols-1 gap-3">
@@ -53,6 +97,7 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
               className={`flex items-center gap-3 p-3 border rounded ${!audioHref ? 'opacity-50 pointer-events-none' : 'hover:bg-black/5'}`}
               href={audioHref}
               download
+              onClick={() => notify('Audio download started')}
             >
               <Mic className="w-5 h-5" /> Download podcast audio (WAV)
             </a>
@@ -60,6 +105,7 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
               className={`flex items-center gap-3 p-3 border rounded ${!videoHref ? 'opacity-50 pointer-events-none' : 'hover:bg-black/5'}`}
               href={videoHref}
               download
+              onClick={() => notify('Video download started')}
             >
               <Video className="w-5 h-5" /> Download video (MP4)
             </a>
@@ -67,6 +113,7 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
               className={`flex items-center gap-3 p-3 border rounded ${!podcastZipHref ? 'opacity-50 pointer-events-none' : 'hover:bg-black/5'}`}
               href={podcastZipHref}
               download
+              onClick={() => notify('Podcast bundle download started')}
             >
               <Download className="w-5 h-5" /> Export podcast bundle (ZIP)
             </a>
@@ -76,4 +123,3 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
     </div>
   )
 }
-

@@ -186,10 +186,24 @@ export async function uploadSourceChunked(
 export async function exportChatPdf(
   title: string,
   messages: Array<{ role: string; content: string }>,
+  coverDataUrl?: string,
   signal?: AbortSignal,
 ): Promise<Blob> {
   const res = await api.post(
     '/export/chat-pdf',
+    { title, messages, cover_data_url: coverDataUrl },
+    { responseType: 'blob', signal },
+  )
+  return res.data
+}
+
+export async function exportChatHtml(
+  title: string,
+  messages: Array<{ role: string; content: string }>,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  const res = await api.post(
+    '/export/chat-html',
     { title, messages },
     { responseType: 'blob', signal },
   )

@@ -24,8 +24,13 @@ export function SourcesPanel() {
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const CHUNK_THRESHOLD = 8 * 1024 * 1024 // 8MB
+    const MAX_FILE_SIZE = 200 * 1024 * 1024 // 200MB
     acceptedFiles.forEach(async (file) => {
       try {
+        if (file.size > MAX_FILE_SIZE) {
+          notify(`File too large (>${Math.round(MAX_FILE_SIZE/1024/1024)}MB): ${file.name}`, 'error')
+          return
+        }
         if (file.size >= CHUNK_THRESHOLD) {
           notify(`Uploading ${file.name} (large) …`)
           const data = await uploadSourceChunked(file, {

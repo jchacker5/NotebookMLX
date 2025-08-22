@@ -202,6 +202,23 @@ ipcMain.handle('api:request', async (event, payload) => {
     if (!allowed.includes(String(method).toUpperCase())) {
       throw new Error('Invalid method')
     }
+    // Whitelist allowed endpoints
+    const allowPatterns = [
+      /^\/api\/upload-source$/,
+      /^\/api\/chat$/,
+      /^\/api\/generate-podcast$/,
+      /^\/api\/task\//,
+      /^\/api\/generate-mindmap$/,
+      /^\/api\/synthesize-voice$/,
+      /^\/api\/train-voice$/,
+      /^\/api\/download\//,
+      /^\/api\/upload-chunk$/,
+      /^\/api\/merge-chunks$/,
+      /^\/api\/export\//,
+    ]
+    if (!allowPatterns.some((re) => re.test(path))) {
+      throw new Error('Path not permitted')
+    }
     const res = await fetch(`http://localhost:8000${path}`, {
       method,
       headers: body ? { 'Content-Type': 'application/json' } : undefined,
