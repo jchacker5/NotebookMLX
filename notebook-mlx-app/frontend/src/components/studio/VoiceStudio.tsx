@@ -85,13 +85,23 @@ export function VoiceStudio({ selectedModel }: VoiceStudioProps) {
   }
 
   return (
-    <div className="flex flex-col h-full max-w-4xl mx-auto">
-      <div className="mb-6">
-        <h3 className="text-xl font-semibold mb-4">Voice Training Studio</h3>
-        <p className="text-muted-foreground">
-          Train custom voices for personalized text-to-speech
-        </p>
-      </div>
+    <div className="flex flex-col h-full">
+      <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div>
+            <h3 className="text-xl font-semibold mb-2">Voice Training</h3>
+            <p className="text-gray-600 mb-4">
+              Train custom voices for personalized text-to-speech using local models
+            </p>
+            
+            {/* Model Info */}
+            <div className="flex items-center space-x-4 text-sm text-gray-600 bg-orange-50 p-3 rounded-lg">
+              <div className="flex items-center space-x-1">
+                <span className="font-medium">TTS Model:</span>
+                <span className="font-mono text-xs">{selectedModel.split('/').pop()}</span>
+              </div>
+            </div>
+          </div>
 
       <div className="space-y-6">
         {/* Voice Name Input */}
@@ -218,6 +228,8 @@ export function VoiceStudio({ selectedModel }: VoiceStudioProps) {
             </div>
           </div>
         )}
+        </div>
+        </div>
       </div>
     </div>
   )

@@ -37,7 +37,7 @@ function createWindow() {
           "script-src 'self'",
           "style-src 'self' 'unsafe-inline'",
           "img-src 'self' data:",
-          "connect-src 'self'",
+          "connect-src 'self' http://127.0.0.1:8000 http://localhost:8000",
           "font-src 'self' data:",
           "media-src 'self' blob: data:",
         ]
@@ -52,11 +52,11 @@ function createWindow() {
   })
 
   // Load the React app
-  mainWindow.loadURL(
-    process.env.NODE_ENV === 'development'
-      ? 'http://localhost:3000'
-      : `file://${path.join(__dirname, '../frontend/dist/index.html')}`
-  );
+  if (process.env.NODE_ENV === 'development') {
+    mainWindow.loadURL('http://localhost:3000');
+  } else {
+    mainWindow.loadFile(path.join(__dirname, '../frontend/dist/index.html'));
+  }
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -92,6 +92,7 @@ function startPythonBackend() {
       cwd: cwd,
       env: {
         ...process.env,
+        BACKEND_DATA_DIR: app.getPath('userData'),
         PYTHONPATH: isDev ? 
           path.join(__dirname, '..', 'backend') : 
           path.join(cwd, 'backend')

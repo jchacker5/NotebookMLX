@@ -87,13 +87,27 @@ export function VideoStudio({ selectedModels }: VideoStudioProps) {
   }, [videoSettings])
 
   return (
-    <div className="flex flex-col h-full max-w-4xl mx-auto">
-      <div className="mb-6">
-        <h3 className="text-xl font-semibold mb-4">Video Generator</h3>
-        <p className="text-muted-foreground">
-          Convert your podcast audio into an engaging video with visualizations
-        </p>
-      </div>
+    <div className="flex flex-col h-full">
+      <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div>
+            <h3 className="text-xl font-semibold mb-2">Video Overview</h3>
+            <p className="text-gray-600 mb-4">
+              Convert your podcast audio into an engaging video with visualizations using local models
+            </p>
+            
+            {/* Model Info */}
+            <div className="flex items-center space-x-4 text-sm text-gray-600 bg-purple-50 p-3 rounded-lg">
+              <div className="flex items-center space-x-1">
+                <span className="font-medium">TTS:</span>
+                <span className="font-mono text-xs">{selectedModels.tts.split('/').pop()}</span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <span className="font-medium">Transcript:</span>
+                <span className="font-mono text-xs">{selectedModels.transcript.split('/').pop()}</span>
+              </div>
+            </div>
+          </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1">
         {/* Settings Panel */}
@@ -203,6 +217,8 @@ export function VideoStudio({ selectedModels }: VideoStudioProps) {
               </video>
             </div>
           )}
+        </div>
+        </div>
         </div>
       </div>
     </div>

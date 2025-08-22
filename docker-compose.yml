@@ -7,6 +7,11 @@ services:
     environment:
       - ALLOWED_ORIGINS=http://localhost:3000,null,app://.
       - DISABLE_ML_IMPORTS=1
+      - BACKEND_DATA_DIR=/data
     volumes:
-      - ./notebook-mlx-app/backend/data:/app/data
-
+      - ./notebook-mlx-app/backend/data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5

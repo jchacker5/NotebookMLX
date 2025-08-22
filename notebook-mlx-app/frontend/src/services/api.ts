@@ -1,7 +1,8 @@
 import axios from 'axios'
 
+const isElectron = typeof window !== 'undefined' && (window as any).electronAPI
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: isElectron && location.protocol === 'file:' ? 'http://127.0.0.1:8000/api' : '/api',
   timeout: 30000,
 })
 

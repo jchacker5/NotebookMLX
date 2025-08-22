@@ -49,15 +49,61 @@ export function NewSourceModal({ onClose, onSuccess }: NewSourceModalProps) {
     }
   }
 
+  const [error, setError] = useState<string>('')
+
   const handleSubmit = async () => {
     setIsUploading(true)
+    setError('')
     
     try {
-      // TODO: Implement actual upload logic
+      // Validate input
+      if (!formData.title.trim()) {
+        throw new Error('Please enter a notebook title')
+      }
+
+      if (selectedType === 'file' && formData.files.length === 0) {
+        throw new Error('Please select at least one file')
+      }
+
+      if (selectedType === 'link' && !formData.url.trim()) {
+        throw new Error('Please enter a valid URL')
+      }
+
+      if (selectedType === 'text' && !formData.text.trim()) {
+        throw new Error('Please enter some text')
+      }
+
+      // Validate file types and sizes
+      if (selectedType === 'file') {
+        for (const file of formData.files) {
+          if (file.size > 50 * 1024 * 1024) { // 50MB limit
+            throw new Error(`File ${file.name} is too large (max 50MB)`)
+          }
+          
+          const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.ppt', '.pptx']
+          const fileExt = '.' + file.name.split('.').pop()?.toLowerCase()
+          if (!allowedTypes.includes(fileExt)) {
+            throw new Error(`File ${file.name} has an unsupported format`)
+          }
+        }
+      }
+
+      // Validate URL format
+      if (selectedType === 'link' && formData.url) {
+        try {
+          new URL(formData.url)
+        } catch {
+          throw new Error('Please enter a valid URL (e.g., https://example.com)')
+        }
+      }
+
+      // TODO: Implement actual upload logic with API calls
       await new Promise(resolve => setTimeout(resolve, 2000))
       
       onSuccess()
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Upload failed unexpectedly'
+      setError(errorMessage)
       console.error('Upload failed:', error)
     } finally {
       setIsUploading(false)
@@ -239,6 +285,15 @@ export function NewSourceModal({ onClose, onSuccess }: NewSourceModalProps) {
             </div>
           )}
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="px-6 pb-4">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="flex items-center justify-end space-x-3 px-6 py-4 border-t bg-gray-50">

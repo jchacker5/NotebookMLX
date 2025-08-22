@@ -19,6 +19,7 @@ Environment
 - `DISABLE_ML_IMPORTS=1` to stub ML during tests/CI.
 - `GEN_CONCURRENCY` to limit concurrent generation.
   - When TTS is disabled, `/api/synthesize-voice` and `/api/train-voice` return 503/error.
+- `BACKEND_DATA_DIR` to control where DB and media are written (defaults to `data/`). Electron sets this to the OS user data dir.
 
 Observability
 - JSON logs to `data/app.log` (rotated). Prometheus counters/histograms per route.

@@ -147,19 +147,22 @@ class Database:
         cursor = conn.cursor()
         
         # Get current task
-        cursor.execute("SELECT data FROM tasks WHERE id = ?", (task_id,))
+        cursor.execute("SELECT status, data FROM tasks WHERE id = ?", (task_id,))
         row = cursor.fetchone()
         
         if row:
+            current_status = row['status']
             current_data = json.loads(row['data'] or '{}')
-            current_data.update(updates)
+            # Do not duplicate top-level status inside JSON by default
+            json_updates = {k: v for k, v in updates.items() if k != 'status'}
+            current_data.update(json_updates)
             
             cursor.execute("""
                 UPDATE tasks 
                 SET status = ?, data = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             """, (
-                updates.get('status', current_data.get('status')),
+                updates.get('status', current_status),
                 json.dumps(current_data),
                 task_id
             ))

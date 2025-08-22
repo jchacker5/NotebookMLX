@@ -12,6 +12,7 @@ Backend Startup
 - Dev: spawns `python3 backend/main.py`.
 - Prod: spawns packaged Python env under `python-dist/`.
 - Logs backend stdout/stderr to console; times out on slow start.
+ - Sets `BACKEND_DATA_DIR` to the OS user data directory so writes are not in the app bundle.
 
 Main Files
 - `main.js`: window creation, CSP, backend lifecycle, IPC validation.

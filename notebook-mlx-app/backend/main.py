@@ -114,8 +114,10 @@ async def add_observability(request: Request, call_next):
         logger.info(json.dumps(log))
 
 # Initialize components
-db = Database()
-file_manager = FileManager()
+data_dir = os.getenv("BACKEND_DATA_DIR", "data")
+Path(data_dir).mkdir(parents=True, exist_ok=True)
+db = Database(db_path=str(Path(data_dir) / "notebookmlx.db"))
+file_manager = FileManager(base_path=data_dir)
 pdf_processor = PDFProcessor()
 transcript_generator = TranscriptGenerator()
 rewriter = Rewriter()
@@ -505,18 +507,27 @@ async def train_voice(
 @app.get("/api/download/{file_type}/{file_id}")
 async def download_file(file_type: str, file_id: str):
     """Download generated files"""
-    file_path = f"data/{file_type}/{file_id}"
-    if not os.path.exists(file_path):
+    allowed_types = {"uploads", "processed", "podcasts", "tts", "voices", "mindmaps", "videos"}
+    if file_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Invalid file type")
+    # prevent path traversal
+    if "/" in file_id or ".." in file_id or file_id.startswith(('.', '/')):
+        raise HTTPException(status_code=400, detail="Invalid file id")
+    # restrict characters
+    import re
+    if not re.match(r"^[\w\-\.@]+$", file_id):
+        raise HTTPException(status_code=400, detail="Invalid file id")
+    file_path = Path(file_manager.base_path) / file_type / file_id
+    if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
-    
-    return FileResponse(file_path)
+    return FileResponse(str(file_path))
 
 if __name__ == "__main__":
     # Create necessary directories
-    os.makedirs("data/uploads", exist_ok=True)
-    os.makedirs("data/podcasts", exist_ok=True)
-    os.makedirs("data/tts", exist_ok=True)
-    os.makedirs("data/voices", exist_ok=True)
+    os.makedirs(os.path.join(data_dir, "uploads"), exist_ok=True)
+    os.makedirs(os.path.join(data_dir, "podcasts"), exist_ok=True)
+    os.makedirs(os.path.join(data_dir, "tts"), exist_ok=True)
+    os.makedirs(os.path.join(data_dir, "voices"), exist_ok=True)
     
     # Run the server (configurable via .env)
     host = os.getenv("BACKEND_HOST", "0.0.0.0")

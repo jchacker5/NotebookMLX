@@ -60,7 +60,12 @@ export function PodcastStudio({ selectedModels }: PodcastStudioProps) {
         height: 80,
       })
 
-      wavesurferRef.current.load(`/api/download/podcasts/${podcastTask.task_id}.wav`)
+      if (podcastTask?.audio_path) {
+        const url = podcastTask.audio_path.startsWith('/api')
+          ? podcastTask.audio_path
+          : `/api/download/podcasts/${podcastTask.task_id}.wav`
+        wavesurferRef.current.load(url)
+      }
       
       wavesurferRef.current.on('finish', () => {
         setIsPlaying(false)
