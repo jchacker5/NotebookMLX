@@ -32,9 +32,9 @@ If you prefer step-by-step control:
 
 ### 1. Install Dependencies
 ```bash
-# Node.js dependencies
-npm install
-cd frontend && npm install && cd ..
+# Install Node.js dependencies
+pnpm install
+cd frontend && pnpm install && cd ..
 
 # Python dependencies  
 cd backend && pip install -r requirements.txt && cd ..
@@ -42,7 +42,7 @@ cd backend && pip install -r requirements.txt && cd ..
 
 ### 2. Build the App
 ```bash
-npm run dist:mac
+pnpm run dist:mac
 ```
 
 ### 3. Install
@@ -75,8 +75,8 @@ sudo xattr -rd com.apple.quarantine /Applications/NotebookMLX.app
 ```bash
 # Rebuild Python environment
 rm -rf python-dist/
-npm run prepare:python
-npm run dist:mac
+pnpm run prepare:python
+pnpm run dist:mac
 ```
 
 ### Models Not Downloading

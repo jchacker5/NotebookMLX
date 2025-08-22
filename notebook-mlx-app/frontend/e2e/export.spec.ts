@@ -35,6 +35,24 @@ test('export modal triggers chat Markdown request', async ({ page }) => {
   await expect.poll(() => called).toBeTruthy()
 })
 
+test('export modal triggers chat HTML request and JSON download', async ({ page }) => {
+  let htmlCalled = false
+  await page.route('**/api/export/chat-html', async (route) => {
+    htmlCalled = true
+    await route.fulfill({ status: 200, contentType: 'text/html', body: '<html></html>' })
+  })
+  await page.goto('/notebook/1')
+  await page.getByRole('button', { name: /Export/i }).click()
+  await page.getByRole('button', { name: /Export chat as HTML/i }).click()
+  await expect.poll(() => htmlCalled).toBeTruthy()
+
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: /Export chat as JSON/i }).click(),
+  ])
+  expect(download.suggestedFilename()).toMatch(/chat_export.*\.json$/)
+})
+
 test('downloads pill appears and navigates to Downloads', async ({ page }) => {
   // Mock generate and task polling
   await page.route('**/api/generate-podcast', async (route) => {

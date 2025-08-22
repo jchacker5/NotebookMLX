@@ -550,6 +550,15 @@ async def upload_chunk(
             except Exception:
                 pass
             raise HTTPException(status_code=413, detail=f"Chunk too large. Max {max_chunk_mb}MB")
+        # Enforce total aggregated size
+        max_total_mb = int(os.getenv('BACKEND_MAX_TOTAL_MB', '400'))
+        total_bytes = file_manager.chunks_total_size(file_id)
+        if total_bytes > max_total_mb * 1024 * 1024:
+            try:
+                os.remove(path)
+            except Exception:
+                pass
+            raise HTTPException(status_code=413, detail=f"Upload too large in total. Max {max_total_mb}MB")
         return {"status": "ok"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

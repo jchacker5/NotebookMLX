@@ -185,3 +185,19 @@ def test_export_chat_html_and_md():
   m = client.post('/api/export/chat-md', json=payload)
   assert m.status_code == 200
   assert 'text/markdown' in m.headers.get('content-type', '')
+
+
+def test_rate_limit_exports_returns_429():
+  os.environ['EXPORT_RATE_LIMIT_PER_MIN'] = '1'
+  from main import app, _rate_buckets
+  # Clear existing buckets to avoid test interactions
+  _rate_buckets.clear()
+  client = TestClient(app)
+  payload = {
+    'title': 'Hello',
+    'messages': [{'role': 'user', 'content': 'Hi'}]
+  }
+  r1 = client.post('/api/export/chat-md', json=payload)
+  assert r1.status_code == 200
+  r2 = client.post('/api/export/chat-md', json=payload)
+  assert r2.status_code == 429

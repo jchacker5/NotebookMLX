@@ -41,28 +41,25 @@ fi
 PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
 echo "✅ Python $PYTHON_VERSION"
 
-# Check npm
-if ! command -v npm &> /dev/null; then
-    echo "❌ npm not found. Please install Node.js which includes npm"
+# Check pnpm
+if ! command -v pnpm &> /dev/null; then
+    echo "❌ pnpm not found. Please install pnpm globally by running: npm install -g pnpm"
     exit 1
 fi
-echo "✅ npm $(npm -v)"
+echo "✅ pnpm $(pnpm -v)"
 
 echo ""
 echo "📦 Installing dependencies..."
 
 # Install Node.js dependencies
 echo "Installing Node.js dependencies..."
-npm install
+pnpm install
 
 echo "Installing frontend dependencies..."
-cd frontend && npm install && cd ..
+cd frontend && pnpm install && cd ..
 
 echo "Installing Python dependencies..."
 cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install --upgrade pip > /dev/null 2>&1
 pip install -r requirements.txt
 cd ..
 
@@ -71,11 +68,11 @@ echo "🔧 Building application..."
 
 # Build the frontend
 echo "Building frontend..."
-npm run build:frontend
+pnpm run build:frontend
 
 # Prepare Python distribution
 echo "Preparing Python distribution..."
-npm run prepare:python
+pnpm run prepare:python
 
 # Create app icon (basic SVG version)
 echo "Creating app icon..."
@@ -84,8 +81,8 @@ node scripts/create-icon.js
 echo ""
 echo "📱 Building macOS app..."
 
-# Build the macOS app (ARM64 only for speed)
-npm run dist:fast
+# Build the macOS app
+pnpm run dist:mac
 
 echo ""
 echo "🎉 Installation Complete!"

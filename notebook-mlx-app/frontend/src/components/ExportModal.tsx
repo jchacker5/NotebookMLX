@@ -53,6 +53,9 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
   const podcastZipHref = podcastTask?.task_id
     ? `/api/export/podcast/${podcastTask.task_id}.zip`
     : undefined
+  const transcriptJsonHref = podcastTask?.task_id
+    ? `/api/export/podcast/${podcastTask.task_id}/segments.json`
+    : undefined
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -162,6 +165,14 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
               onClick={() => notify('Podcast bundle download started')}
             >
               <Download className="w-5 h-5" /> Export podcast bundle (ZIP)
+            </a>
+            <a
+              className={`flex items-center gap-3 p-3 border rounded ${!transcriptJsonHref ? 'opacity-50 pointer-events-none' : 'hover:bg-black/5'}`}
+              href={transcriptJsonHref}
+              download
+              onClick={() => notify('Transcript JSON download started')}
+            >
+              <FileText className="w-5 h-5" /> Transcript + timings (JSON)
             </a>
           </div>
         </div>

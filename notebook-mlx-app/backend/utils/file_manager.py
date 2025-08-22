@@ -74,6 +74,22 @@ class FileManager:
         # Cleanup chunks
         shutil.rmtree(chunks_dir, ignore_errors=True)
         return str(output_path)
+
+    def chunks_dir(self, file_id: str) -> Path:
+        return self.base_path / "uploads" / "chunks" / file_id
+
+    def chunks_total_size(self, file_id: str) -> int:
+        """Total size in bytes of all saved chunks for a given file_id"""
+        d = self.chunks_dir(file_id)
+        if not d.exists():
+            return 0
+        total = 0
+        for p in d.glob('*.part'):
+            try:
+                total += p.stat().st_size
+            except Exception:
+                pass
+        return total
     
     def delete_file(self, file_path: str) -> bool:
         """Delete a file"""
