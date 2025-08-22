@@ -56,6 +56,13 @@ def test_text_upload_and_chat_contract():
     if payload['citations']:
         assert 'sourceId' in payload['citations'][0]
 
+    # verify download of uploaded file succeeds
+    from pathlib import Path
+    ext = Path('sample.txt').suffix
+    file_id = f"{sid}{ext}"
+    d = client.get(f"/api/download/uploads/{file_id}")
+    assert d.status_code == 200
+
 
 def test_chunked_upload_and_merge_text():
     os.environ.setdefault('DISABLE_ML_IMPORTS', '1')
@@ -108,4 +115,3 @@ def test_tts_endpoints_guarded():
     assert sv.status_code == 503
     tv = client.post('/api/train-voice', files={'voice_name': (None, 'v1'), 'audio_files': ('a.wav', io.BytesIO(b'00'), 'audio/wav')})
     assert tv.status_code in (200, 503)
-

@@ -2,11 +2,13 @@ import { useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { Upload, File, FileText, Trash2 } from 'lucide-react'
 import { useStore } from '../store/useStore'
-import { uploadSource } from '../services/api'
+import { uploadSource, uploadSourceChunked } from '../services/api'
 import { useMutation } from '@tanstack/react-query'
+import { useToast } from './Toast'
 
 export function SourcesPanel() {
   const { sources, selectedSources, addSource, removeSource, toggleSourceSelection } = useStore()
+  const { notify } = useToast()
 
   const uploadMutation = useMutation({
     mutationFn: uploadSource,
@@ -21,10 +23,31 @@ export function SourcesPanel() {
   })
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    acceptedFiles.forEach((file) => {
-      uploadMutation.mutate(file)
+    const CHUNK_THRESHOLD = 8 * 1024 * 1024 // 8MB
+    acceptedFiles.forEach(async (file) => {
+      try {
+        if (file.size >= CHUNK_THRESHOLD) {
+          notify(`Uploading ${file.name} (large) …`)
+          const data = await uploadSourceChunked(file, {
+            onProgress: (p) => {
+              if (p === 100) notify(`Processing ${file.name} …`)
+            },
+          })
+          addSource({
+            id: data.source_id,
+            filename: data.filename,
+            type: data.filename.endsWith('.pdf') ? 'pdf' : 'text',
+            uploadedAt: new Date(),
+          })
+          notify(`${file.name} uploaded`)
+        } else {
+          uploadMutation.mutate(file)
+        }
+      } catch (e) {
+        notify(`Upload failed: ${(e as Error).message}`, 'error')
+      }
     })
-  }, [uploadMutation])
+  }, [addSource, notify, uploadMutation])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

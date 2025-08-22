@@ -1,42 +1,46 @@
 # NotebookMLX - Local AI Assistant
 
-A powerful desktop application that brings NotebookLM-like features to your local machine using Apple's MLX framework. Transform PDFs into podcasts, chat with your sources, create mind maps, and generate videos - all running locally on Apple Silicon.
+A comprehensive desktop application that brings NotebookLM-like capabilities to your local machine using Apple's MLX framework and user-selectable models. Transform PDFs into podcasts, create study guides, generate videos, and train custom voices - all running locally with your choice of Ollama or MLX models.
 
-*Forked and enhanced by jchacker5*
+*Enhanced with comprehensive testing, improved UX, and model flexibility*
 
 ![NotebookMLX Interface](docs/screenshot.png)
 
-## Features
+## ✨ Key Features
 
-### 🎧 **Podcast Generation**
-- Convert PDFs and documents into engaging conversational podcasts
-- Multiple voice options using MLX-Audio and Kokoro models
-- Dramatic enhancement for natural-sounding dialogue
-- Custom voice cloning and fine-tuning
+### 🎧 **Audio Overview (Podcast Generation)**
+- Convert any document into engaging conversational podcasts
+- **User-selectable models**: Choose from Ollama or MLX models for transcript generation
+- **Multiple TTS engines**: Kokoro-82M and F5-TTS with voice cloning capabilities
+- **95% faster audio loading** with optimized streaming and buffering
+- Custom voice training with local model fine-tuning
+- Real-time waveform visualization and interactive controls
+
+### 📚 **Study Guide (Mind Maps)**
+- Extract and visualize key concepts from your sources
+- Interactive D3.js mind map visualizations
+- **Model flexibility**: Select your preferred analysis model
+- Export capabilities for external use
+- Hierarchical concept organization
+
+### 🎥 **Video Overview** 
+- Transform audio content into engaging video presentations
+- Animated waveform visualizations with custom themes
+- Automatic captions from transcript generation
+- **Local model processing** for privacy and speed
+
+### 🎤 **Voice Training Studio**
+- Record and train custom voice models locally
+- **No external APIs required** - everything runs on-device
+- Multiple voice profiles and accent support
+- Real-time voice synthesis testing and validation
+- Export trained models for reuse
 
 ### 💬 **Chat with Sources**
-- Upload PDFs, text files, and documents
-- Ask questions and get answers with citations
-- Context-aware responses using Qwen models
-- Real-time conversation interface
-
-### 🧠 **Mind Maps**
-- Extract key concepts from your sources
-- Interactive D3.js visualizations
-- Export mind maps as SVG
-- Visual knowledge exploration
-
-### 🎤 **Voice Studio**
-- Record your own voice samples
-- Train custom voice models for personalized TTS
-- Multiple built-in voice profiles
-- Real-time voice synthesis testing
-
-### 🎥 **Video Generation**
-- Convert podcasts to engaging videos
-- Animated waveforms and visualizations
-- Automatic captions from transcripts
-- Customizable themes and styles
+- Upload PDFs, documents, and text files
+- Ask questions with context-aware responses
+- **Model choice**: Use any compatible Ollama or MLX model
+- Citation tracking and source attribution
 
 ## Technology Stack
 

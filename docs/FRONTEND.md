@@ -17,5 +17,5 @@ Commands
 - E2E: `pnpm dlx playwright install && pnpm run build && pnpm run test:e2e`
 
 Chunked Uploads
-- Use `uploadSourceChunked(file, { onProgress, signal })` for large files; shows progress via toasts.
-
+- Large files (>= 8MB) are uploaded via `uploadSourceChunked()` automatically from the Sources panel.
+- Progress and status are surfaced via toasts; small files use the standard upload path.
