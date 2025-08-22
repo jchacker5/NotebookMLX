@@ -302,6 +302,26 @@ async def export_chat_html(payload: ChatExportRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/export/chat-md")
+async def export_chat_md(payload: ChatExportRequest):
+    try:
+        lines = [f"# {payload.title}", ""]
+        for m in payload.messages:
+            role = (m.role or '').capitalize()
+            content = (m.content or '')
+            lines.append(f"**{role}:** {content}")
+            lines.append("")
+        content = "\n".join(lines).encode('utf-8')
+        fd, tmp_path = tempfile.mkstemp(suffix=".md")
+        os.close(fd)
+        with open(tmp_path, 'wb') as f:
+            f.write(content)
+        filename = f"chat_export_{uuid.uuid4().hex[:8]}.md"
+        return FileResponse(tmp_path, filename=filename, media_type="text/markdown; charset=utf-8")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/export/podcast/{task_id}.zip")
 async def export_podcast_zip(task_id: str):
     """Export podcast transcript, metadata, and audio (if available) as a ZIP"""

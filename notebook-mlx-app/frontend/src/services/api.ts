@@ -209,3 +209,16 @@ export async function exportChatHtml(
   )
   return res.data
 }
+
+export async function exportChatMd(
+  title: string,
+  messages: Array<{ role: string; content: string }>,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  const res = await api.post(
+    '/export/chat-md',
+    { title, messages },
+    { responseType: 'blob', signal },
+  )
+  return res.data
+}

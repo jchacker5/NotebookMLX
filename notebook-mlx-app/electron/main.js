@@ -199,24 +199,26 @@ ipcMain.handle('api:request', async (event, payload) => {
       throw new Error('Invalid API path')
     }
     const allowed = ['GET', 'POST']
-    if (!allowed.includes(String(method).toUpperCase())) {
+    const methodUpper = String(method).toUpperCase()
+    if (!allowed.includes(methodUpper)) {
       throw new Error('Invalid method')
     }
-    // Whitelist allowed endpoints
-    const allowPatterns = [
-      /^\/api\/upload-source$/,
-      /^\/api\/chat$/,
-      /^\/api\/generate-podcast$/,
-      /^\/api\/task\//,
-      /^\/api\/generate-mindmap$/,
-      /^\/api\/synthesize-voice$/,
-      /^\/api\/train-voice$/,
-      /^\/api\/download\//,
-      /^\/api\/upload-chunk$/,
-      /^\/api\/merge-chunks$/,
-      /^\/api\/export\//,
+    // Whitelist endpoints with method restrictions
+    const allow = [
+      { re: /^\/api\/upload-source$/, methods: ['POST'] },
+      { re: /^\/api\/chat$/, methods: ['POST'] },
+      { re: /^\/api\/generate-podcast$/, methods: ['POST'] },
+      { re: /^\/api\/task\//, methods: ['GET'] },
+      { re: /^\/api\/generate-mindmap$/, methods: ['POST'] },
+      { re: /^\/api\/synthesize-voice$/, methods: ['POST'] },
+      { re: /^\/api\/train-voice$/, methods: ['POST'] },
+      { re: /^\/api\/download\//, methods: ['GET'] },
+      { re: /^\/api\/upload-chunk$/, methods: ['POST'] },
+      { re: /^\/api\/merge-chunks$/, methods: ['POST'] },
+      { re: /^\/api\/export\//, methods: ['GET', 'POST'] },
     ]
-    if (!allowPatterns.some((re) => re.test(path))) {
+    const matched = allow.find((x) => x.re.test(path))
+    if (!matched || !matched.methods.includes(methodUpper)) {
       throw new Error('Path not permitted')
     }
     const res = await fetch(`http://localhost:8000${path}`, {

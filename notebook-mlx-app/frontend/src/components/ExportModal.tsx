@@ -91,6 +91,21 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
           >
             <FileText className="w-5 h-5" /> Export chat as HTML
           </button>
+          <button
+            onClick={async () => {
+              const blob = await (await import('../services/api')).exportChatMd(title || 'Chat Export', chatForExport)
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = `${(title || 'chat_export').replace(/\s+/g, '_').toLowerCase()}.md`
+              a.click()
+              URL.revokeObjectURL(url)
+              notify('Chat Markdown exported')
+            }}
+            className="w-full flex items-center gap-3 p-3 border rounded hover:bg-black/5"
+          >
+            <FileText className="w-5 h-5" /> Export chat as Markdown
+          </button>
 
           <div className="grid grid-cols-1 gap-3">
             <a

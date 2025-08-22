@@ -14,6 +14,8 @@ Endpoints (selection)
 - `POST /api/generate-podcast` → background transcript/tts; `GET /api/task/{id}` for status.
 - `POST /api/upload-chunk`, `POST /api/merge-chunks` → large file uploads (parameters via `multipart/form-data` and `Form(...)` fields).
 - `POST /api/export/chat-pdf` → generate a PDF from chat messages.
+- `POST /api/export/chat-html` → generate an editable HTML transcript.
+- `POST /api/export/chat-md` → generate a Markdown transcript.
 - `GET /api/export/podcast/{task_id}.zip` → export podcast transcript, metadata, segments (with placeholder timestamps), model metadata, and audio (if available) as a ZIP. Includes `assets/icon.svg` as cover when available.
 
 Environment

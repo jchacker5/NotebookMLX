@@ -1,5 +1,6 @@
 import { useState, lazy, Suspense } from 'react'
 import { Settings, Play, Sparkles, Cpu, MessageSquare, FileVideo, BrainCircuit, Loader2, Download } from 'lucide-react'
+import { useStore } from '../store/useStore'
 import { ModelSelector } from './ModelSelector'
 
 // Lazy load heavy studio components to reduce initial bundle size
@@ -37,6 +38,8 @@ export function StudioPanel() {
     tts: 'mlx-community/Kokoro-82M-bf16',
     pdf_processor: 'mlx-community/Qwen2.5-1.5B-Instruct-4bit'
   })
+  const { podcastTask } = useStore()
+  const downloadsReady = Boolean(podcastTask && (podcastTask.status === 'completed' || podcastTask.audio_path))
 
   const studioOptions: StudioOption[] = [
     {
@@ -192,6 +195,15 @@ export function StudioPanel() {
               <Cpu className="h-4 w-4" />
               <span>Local models</span>
             </div>
+            {downloadsReady && (
+              <button
+                onClick={() => setActiveTab('downloads')}
+                className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 border border-green-200 hover:bg-green-200"
+                title="Downloads ready"
+              >
+                Downloads ready
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('settings')}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
