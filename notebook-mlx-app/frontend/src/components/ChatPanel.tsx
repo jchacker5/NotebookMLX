@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Loader2 } from 'lucide-react'
+import { Send, Loader2, Download } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { chatWithSources } from '../services/api'
 import { useMutation } from '@tanstack/react-query'
 import ReactMarkdown from 'react-markdown'
+import { ExportModal } from './ExportModal'
 
 export function ChatPanel() {
   const [input, setInput] = useState('')
+  const [showExport, setShowExport] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { messages, selectedSources, addMessage, isLoading, setLoading } = useStore()
 
@@ -50,6 +52,15 @@ export function ChatPanel() {
 
   return (
     <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between px-6 py-3 border-b">
+        <div className="text-sm text-muted-foreground">Chat</div>
+        <button
+          onClick={() => setShowExport(true)}
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded bg-secondary hover:bg-secondary/80"
+        >
+          <Download className="w-4 h-4" /> Export
+        </button>
+      </div>
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-6">
         {messages.length === 0 ? (
@@ -140,6 +151,7 @@ export function ChatPanel() {
           </button>
         </div>
       </form>
+      {showExport && <ExportModal onClose={() => setShowExport(false)} />}
     </div>
   )
 }

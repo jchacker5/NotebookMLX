@@ -10,7 +10,8 @@ Key Areas
 - `src/App.tsx`: notebooks view + main panels (Sources, Chat, Studio).
 - `src/services/api.ts`: API client with request IDs, cancellation, chunked uploads.
 - `src/components/*`: UI components; `ErrorBoundary`, `Toast` for UX resilience.
- - Electron packaging: API baseURL auto-switches to `http://127.0.0.1:8000/api` when running under `file://`.
+- Electron packaging: API baseURL auto-switches to `http://127.0.0.1:8000/api` when running under `file://`.
+- `src/components/ExportModal.tsx`: unified export modal for chat PDF, audio/video download, and podcast ZIP export.
 
 Commands
 - Dev: `pnpm start`

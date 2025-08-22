@@ -181,3 +181,17 @@ export async function uploadSourceChunked(
   const res = await api.post('/merge-chunks', mergeForm, { signal: opts?.signal })
   return res.data
 }
+
+// Export chat to PDF
+export async function exportChatPdf(
+  title: string,
+  messages: Array<{ role: string; content: string }>,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  const res = await api.post(
+    '/export/chat-pdf',
+    { title, messages },
+    { responseType: 'blob', signal },
+  )
+  return res.data
+}

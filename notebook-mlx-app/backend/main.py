@@ -20,6 +20,10 @@ from logging.handlers import RotatingFileHandler
 import json
 import time
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+import tempfile
+import zipfile
 
 DISABLE_ML = os.getenv("DISABLE_ML_IMPORTS", "0") == "1"
 if not DISABLE_ML:
@@ -157,6 +161,16 @@ class ChunkInitResponse(BaseModel):
     filename: str
     total_chunks: int
 
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ChatExportRequest(BaseModel):
+    title: str = "Chat Export"
+    messages: List[ChatMessage]
+
 # Routes
 @app.get("/")
 async def root():
@@ -171,6 +185,70 @@ async def healthz():
 @app.get("/metrics")
 async def metrics():
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
+@app.post("/api/export/chat-pdf")
+async def export_chat_pdf(payload: ChatExportRequest):
+    """Generate a PDF from chat messages and return it"""
+    try:
+        fd, tmp_path = tempfile.mkstemp(suffix=".pdf")
+        os.close(fd)
+        c = canvas.Canvas(tmp_path, pagesize=letter)
+        width, height = letter
+        margin = 50
+        y = height - margin
+        c.setTitle(payload.title)
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(margin, y, payload.title)
+        y -= 30
+        c.setFont("Helvetica", 11)
+        for m in payload.messages:
+            lines = [f"{m.role.capitalize()}: {line}" for line in m.content.split("\n")]
+            for line in lines:
+                if y < margin + 50:
+                    c.showPage()
+                    y = height - margin
+                    c.setFont("Helvetica", 11)
+                c.drawString(margin, y, line[:110])
+                y -= 16
+            y -= 8
+        c.save()
+        filename = f"chat_export_{uuid.uuid4().hex[:8]}.pdf"
+        return FileResponse(tmp_path, filename=filename, media_type="application/pdf")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/export/podcast/{task_id}.zip")
+async def export_podcast_zip(task_id: str):
+    """Export podcast transcript, metadata, and audio (if available) as a ZIP"""
+    task = db.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    try:
+        fd, tmp_zip = tempfile.mkstemp(suffix=".zip")
+        os.close(fd)
+        with zipfile.ZipFile(tmp_zip, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+            meta = {
+                "id": task_id,
+                "type": task.get("type"),
+                "status": task.get("status"),
+                "created_at": task.get("created_at"),
+                "updated_at": task.get("updated_at"),
+            }
+            from io import BytesIO
+            zf.writestr('metadata.json', json.dumps(meta, indent=2))
+            data = task.get('data') or {}
+            transcript = data.get('transcript')
+            if transcript:
+                zf.writestr('transcript.json', json.dumps(transcript, indent=2))
+            audio_path = data.get('audio_path') or task.get('audio_path')
+            if audio_path and os.path.exists(audio_path):
+                zf.write(audio_path, arcname=os.path.join('audio', os.path.basename(audio_path)))
+        filename = f"podcast_{task_id}.zip"
+        return FileResponse(tmp_zip, filename=filename, media_type="application/zip")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/upload-source")
 async def upload_source(file: UploadFile = File(...)):
