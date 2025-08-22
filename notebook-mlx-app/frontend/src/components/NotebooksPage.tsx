@@ -16,7 +16,6 @@ export function NotebooksPage() {
   const [notebooks, setNotebooks] = useState<Notebook[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [showNewSourceModal, setShowNewSourceModal] = useState(false)
-  const [selectedNotebook, setSelectedNotebook] = useState<string | null>(null)
 
   useEffect(() => {
     // Load notebooks from API
@@ -24,32 +23,76 @@ export function NotebooksPage() {
   }, [])
 
   const fetchNotebooks = async () => {
-    // Placeholder data
+    // Real-world inspired notebook examples based on 2024 trending topics
     setNotebooks([
       {
         id: '1',
-        title: 'Machine Learning Research',
-        description: 'Collection of papers on deep learning and neural networks',
-        sources: 5,
+        title: 'Llama 3 & Small Language Models',
+        description: 'Analysis of Meta\'s 405B model and research on efficient SLMs - 8 research papers including ICLR 2024 outstanding papers',
+        sources: 8,
         lastModified: '2 hours ago',
         isFeatured: true,
         type: 'pdf'
       },
       {
         id: '2',
-        title: 'Podcast Interviews',
-        description: 'Tech podcast episodes for analysis',
-        sources: 3,
+        title: 'Agentic AI Revolution',
+        description: 'Comprehensive study on autonomous AI agents, Salesforce Agentforce, and the future of AI decision-making',
+        sources: 12,
+        lastModified: '6 hours ago',
+        isFeatured: true,
+        type: 'pdf'
+      },
+      {
+        id: '3',
+        title: 'Multimodal LLMs Breakthrough',
+        description: 'NVIDIA NVLM, Visual AutoRegressive modeling (VAR), and the latest in vision-language models from NeurIPS 2024',
+        sources: 6,
+        lastModified: '1 day ago',
+        isFeatured: true,
+        type: 'pdf'
+      },
+      {
+        id: '4',
+        title: 'RLHF & AI Safety Research',
+        description: 'DPO vs PPO comparison, reinforcement learning from human feedback, and building robust AI systems',
+        sources: 9,
+        lastModified: '2 days ago',
+        isFeatured: true,
+        type: 'pdf'
+      },
+      {
+        id: '5',
+        title: 'Quantum Computing Breakthroughs',
+        description: 'Google\'s Willow chip announcement, quantum error correction, and the path to practical quantum advantage',
+        sources: 5,
+        lastModified: '3 hours ago',
+        isFeatured: true,
+        type: 'pdf'
+      },
+      {
+        id: '6',
+        title: 'AI Podcast Deep Dives',
+        description: 'Lex Fridman interviews with Anthropic researchers, OpenAI discussions, and tech leader insights',
+        sources: 15,
         lastModified: '1 day ago',
         type: 'audio'
       },
       {
-        id: '3',
-        title: 'Video Lectures',
-        description: 'Computer science lecture series',
-        sources: 8,
+        id: '7',
+        title: 'Stanford CS229 Lectures',
+        description: 'Machine learning course materials and video lectures from Stanford University - Winter 2024',
+        sources: 24,
         lastModified: '3 days ago',
         type: 'video'
+      },
+      {
+        id: '8',
+        title: 'Synthetic Data & Scaling Laws',
+        description: 'Research on improving LLMs through synthetic training data and inference-time compute scaling',
+        sources: 7,
+        lastModified: '4 days ago',
+        type: 'pdf'
       }
     ])
   }

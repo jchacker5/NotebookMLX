@@ -24,6 +24,11 @@ class Database:
         """Initialize database tables"""
         conn = self._get_conn()
         cursor = conn.cursor()
+
+        # Improve durability and concurrency
+        cursor.execute("PRAGMA journal_mode=WAL;")
+        cursor.execute("PRAGMA synchronous=NORMAL;")
+        cursor.execute("PRAGMA busy_timeout=5000;")
         
         # Sources table
         cursor.execute("""

@@ -47,6 +47,33 @@ class FileManager:
     def get_file_path(self, category: str, file_id: str, extension: str = "") -> Path:
         """Get the path for a file"""
         return self.base_path / category / f"{file_id}{extension}"
+
+    async def save_chunk(self, file_id: str, chunk_index: int, chunk: UploadFile) -> str:
+        """Save a file chunk under data/uploads/chunks/<file_id>/"""
+        chunks_dir = self.base_path / "uploads" / "chunks" / file_id
+        chunks_dir.mkdir(parents=True, exist_ok=True)
+        chunk_path = chunks_dir / f"{chunk_index:06d}.part"
+        async with aiofiles.open(chunk_path, 'wb') as f:
+            content = await chunk.read()
+            await f.write(content)
+        return str(chunk_path)
+
+    def merge_chunks(self, file_id: str, filename: str) -> str:
+        """Merge saved chunks into a single file and return path"""
+        chunks_dir = self.base_path / "uploads" / "chunks" / file_id
+        if not chunks_dir.exists():
+            raise FileNotFoundError("Chunks directory not found")
+        # Determine extension
+        ext = Path(filename).suffix
+        output_path = self.base_path / "uploads" / f"{file_id}{ext}"
+        part_files = sorted(chunks_dir.glob("*.part"))
+        with open(output_path, 'wb') as out:
+            for part in part_files:
+                with open(part, 'rb') as p:
+                    shutil.copyfileobj(p, out)
+        # Cleanup chunks
+        shutil.rmtree(chunks_dir, ignore_errors=True)
+        return str(output_path)
     
     def delete_file(self, file_path: str) -> bool:
         """Delete a file"""

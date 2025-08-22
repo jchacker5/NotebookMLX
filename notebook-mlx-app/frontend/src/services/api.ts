@@ -5,6 +5,22 @@ const api = axios.create({
   timeout: 30000,
 })
 
+// Add request-id and friendly errors
+api.interceptors.request.use((config) => {
+  (config.headers as any)['X-Request-ID'] = `${Date.now()}-${Math.random()}`
+  return config
+})
+
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.code === 'ERR_NETWORK') {
+      err.message = 'Network error. Are you offline or is the backend down?'
+    }
+    return Promise.reject(err)
+  },
+)
+
 // Types
 export interface Source {
   source_id: string
@@ -36,7 +52,7 @@ export interface VoiceTrainingResponse {
 }
 
 // API Functions
-export async function uploadSource(file: File): Promise<Source> {
+export async function uploadSource(file: File, signal?: AbortSignal): Promise<Source> {
   const formData = new FormData()
   formData.append('file', file)
   
@@ -44,6 +60,7 @@ export async function uploadSource(file: File): Promise<Source> {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
+    signal,
   })
   
   return response.data
@@ -51,12 +68,14 @@ export async function uploadSource(file: File): Promise<Source> {
 
 export async function chatWithSources(
   message: string,
-  sourceIds: string[]
+  sourceIds: string[],
+  signal?: AbortSignal,
 ): Promise<ChatResponse> {
-  const response = await api.post('/chat', {
-    message,
-    source_ids: sourceIds,
-  })
+  const response = await api.post(
+    '/chat',
+    { message, source_ids: sourceIds },
+    { signal },
+  )
   
   return response.data
 }
@@ -67,48 +86,52 @@ export async function generatePodcast(
     speaker1: string
     speaker2: string
     enhanceDrama: boolean
-  }
+  },
+  signal?: AbortSignal,
 ): Promise<PodcastTask> {
-  const response = await api.post('/generate-podcast', {
-    source_ids: sourceIds,
-    speaker1_voice: options.speaker1,
-    speaker2_voice: options.speaker2,
-    enhance_drama: options.enhanceDrama,
-  })
+  const response = await api.post(
+    '/generate-podcast',
+    {
+      source_ids: sourceIds,
+      speaker1_voice: options.speaker1,
+      speaker2_voice: options.speaker2,
+      enhance_drama: options.enhanceDrama,
+    },
+    { signal },
+  )
   
   return response.data
 }
 
-export async function getTaskStatus(taskId: string): Promise<PodcastTask> {
-  const response = await api.get(`/task/${taskId}`)
+export async function getTaskStatus(taskId: string, signal?: AbortSignal): Promise<PodcastTask> {
+  const response = await api.get(`/task/${taskId}`, { signal })
   return response.data
 }
 
-export async function generateMindMap(sourceIds: string[]): Promise<any> {
-  const response = await api.post('/generate-mindmap', {
-    source_ids: sourceIds,
-  })
+export async function generateMindMap(sourceIds: string[], signal?: AbortSignal): Promise<any> {
+  const response = await api.post('/generate-mindmap', { source_ids: sourceIds }, { signal })
   
   return response.data
 }
 
 export async function synthesizeVoice(
   text: string,
-  voiceId: string
+  voiceId: string,
+  signal?: AbortSignal,
 ): Promise<Blob> {
-  const response = await api.post('/synthesize-voice', {
-    text,
-    voice_id: voiceId,
-  }, {
-    responseType: 'blob',
-  })
+  const response = await api.post(
+    '/synthesize-voice',
+    { text, voice_id: voiceId },
+    { responseType: 'blob', signal },
+  )
   
   return response.data
 }
 
 export async function trainVoice(
   audioFiles: File[],
-  voiceName: string
+  voiceName: string,
+  signal?: AbortSignal,
 ): Promise<VoiceTrainingResponse> {
   const formData = new FormData()
   audioFiles.forEach(file => formData.append('audio_files', file))
@@ -118,15 +141,42 @@ export async function trainVoice(
     headers: {
       'Content-Type': 'multipart/form-data',
     },
+    signal,
   })
   
   return response.data
 }
 
-export async function downloadFile(fileType: string, fileId: string): Promise<Blob> {
-  const response = await api.get(`/download/${fileType}/${fileId}`, {
-    responseType: 'blob',
-  })
+export async function downloadFile(fileType: string, fileId: string, signal?: AbortSignal): Promise<Blob> {
+  const response = await api.get(`/download/${fileType}/${fileId}`, { responseType: 'blob', signal })
   
   return response.data
+}
+
+// Optional: chunked upload for large files
+export async function uploadSourceChunked(
+  file: File,
+  opts?: { chunkSize?: number; onProgress?: (p: number) => void; signal?: AbortSignal },
+): Promise<Source> {
+  const chunkSize = opts?.chunkSize ?? 5 * 1024 * 1024
+  const totalChunks = Math.ceil(file.size / chunkSize)
+  const fileId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * chunkSize
+    const end = Math.min(start + chunkSize, file.size)
+    const blob = file.slice(start, end)
+    const form = new FormData()
+    form.append('file_id', fileId)
+    form.append('chunk_index', String(i))
+    form.append('total_chunks', String(totalChunks))
+    form.append('filename', file.name)
+    form.append('chunk', blob, `${file.name}.part`)
+    await api.post('/upload-chunk', form, { signal: opts?.signal })
+    opts?.onProgress?.(((i + 1) / totalChunks) * 100)
+  }
+  const mergeForm = new FormData()
+  mergeForm.append('file_id', fileId)
+  mergeForm.append('filename', file.name)
+  const res = await api.post('/merge-chunks', mergeForm, { signal: opts?.signal })
+  return res.data
 }

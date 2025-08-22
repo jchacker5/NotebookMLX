@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  backend:
+    build: ./notebook-mlx-app/backend
+    ports:
+      - "8000:8000"
+    environment:
+      - ALLOWED_ORIGINS=http://localhost:3000,null,app://.
+      - DISABLE_ML_IMPORTS=1
+    volumes:
+      - ./notebook-mlx-app/backend/data:/app/data
+

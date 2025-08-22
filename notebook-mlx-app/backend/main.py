@@ -8,12 +8,18 @@ from typing import List, Optional
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import uvicorn
 from dotenv import load_dotenv
+import hashlib
+import logging
+from logging.handlers import RotatingFileHandler
+import json
+import time
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
 DISABLE_ML = os.getenv("DISABLE_ML_IMPORTS", "0") == "1"
 if not DISABLE_ML:
@@ -64,6 +70,45 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Structured logging
+logger = logging.getLogger("notebookmlx")
+logger.setLevel(logging.INFO)
+log_dir = Path('data')
+log_dir.mkdir(parents=True, exist_ok=True)
+fh = RotatingFileHandler(log_dir / 'app.log', maxBytes=2_000_000, backupCount=3)
+sh = logging.StreamHandler()
+for h in (fh, sh):
+    h.setFormatter(logging.Formatter('%(message)s'))
+    logger.addHandler(h)
+
+# Prometheus metrics
+REQ_COUNT = Counter("http_requests_total", "Total HTTP requests", ["method", "path", "status"])
+REQ_LATENCY = Histogram("http_request_duration_seconds", "Request latency", ["method", "path"])
+
+
+@app.middleware("http")
+async def add_observability(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+    start = time.time()
+    try:
+        response = await call_next(request)
+        status = response.status_code
+        return response
+    finally:
+        duration = time.time() - start
+        REQ_COUNT.labels(request.method, request.url.path, str(status)).inc()
+        REQ_LATENCY.labels(request.method, request.url.path).observe(duration)
+        log = {
+            "ts": datetime.utcnow().isoformat() + "Z",
+            "level": "info",
+            "request_id": request_id,
+            "method": request.method,
+            "path": request.url.path,
+            "status": status,
+            "duration_ms": int(duration * 1000),
+        }
+        logger.info(json.dumps(log))
+
 # Initialize components
 db = Database()
 file_manager = FileManager()
@@ -100,10 +145,26 @@ class TrainVoiceResponse(BaseModel):
     voice_id: str
     message: str
 
+
+class ChunkInitResponse(BaseModel):
+    file_id: str
+    filename: str
+    total_chunks: int
+
 # Routes
 @app.get("/")
 async def root():
     return {"message": "NotebookMLX API is running"}
+
+
+@app.get("/healthz")
+async def healthz():
+    return {"status": "ok"}
+
+
+@app.get("/metrics")
+async def metrics():
+    return FileResponse(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 @app.post("/api/upload-source")
 async def upload_source(file: UploadFile = File(...)):
@@ -113,10 +174,25 @@ async def upload_source(file: UploadFile = File(...)):
         source_id = str(uuid.uuid4())
         file_path = await file_manager.save_upload(file, source_id)
         
-        # Process based on file type
+        # Compute file hash for caching
+        hasher = hashlib.sha256()
+        content = await file.read()
+        hasher.update(content)
+        file_hash = hasher.hexdigest()
+        await file.seek(0)
+
+        # Save uploaded file
         if file.filename.endswith('.pdf'):
             # Process PDF
-            processed_text = pdf_processor.process_pdf(file_path)
+            # Check cache first
+            cache_path = file_manager.get_file_path("processed", file_hash + ".txt")
+            if os.path.exists(cache_path):
+                with open(cache_path, 'r', encoding='utf-8') as cf:
+                    processed_text = cf.read()
+            else:
+                processed_text = pdf_processor.process_pdf(file_path)
+                with open(cache_path, 'w', encoding='utf-8') as cf:
+                    cf.write(processed_text)
             
             # Save to database
             db.add_source({
@@ -147,6 +223,33 @@ async def upload_source(file: UploadFile = File(...)):
             "status": "processed"
         }
         
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/upload-chunk")
+async def upload_chunk(
+    file_id: str = File(...),
+    chunk_index: int = File(...),
+    total_chunks: int = File(...),
+    filename: str = File(...),
+    chunk: UploadFile = File(...),
+):
+    try:
+        await file_manager.save_chunk(file_id, int(chunk_index), chunk)
+        return {"status": "ok"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/merge-chunks")
+async def merge_chunks(file_id: str = File(...), filename: str = File(...)):
+    try:
+        merged_path = file_manager.merge_chunks(file_id, filename)
+        # After merge, process like a normal upload
+        dummy_upload = UploadFile(filename=filename, file=open(merged_path, 'rb'))
+        result = await upload_source(dummy_upload)
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -215,6 +318,9 @@ async def generate_podcast(request: PodcastRequest, background_tasks: Background
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+_GEN_SEMAPHORE = asyncio.Semaphore(int(os.getenv("GEN_CONCURRENCY", "2")))
+
+
 async def generate_podcast_task(task_id: str, text: str, voice1: str, voice2: str, enhance: bool):
     """Background task for podcast generation"""
     try:
@@ -225,30 +331,36 @@ async def generate_podcast_task(task_id: str, text: str, voice1: str, voice2: st
             "status": "generating_transcript"
         })
         
-        # Generate transcript
-        transcript = transcript_generator.generate_transcript(text)
-        segments = transcript_generator.parse_transcript(transcript)
+        async with _GEN_SEMAPHORE:
+            # Generate transcript
+            transcript = transcript_generator.generate_transcript(text)
+            segments = transcript_generator.parse_transcript(transcript)
         
         # Enhance if requested
         if enhance:
             db.update_task(task_id, {"status": "enhancing_transcript"})
             segments = rewriter.enhance_transcript(segments)
         
-        # Generate audio
-        db.update_task(task_id, {"status": "generating_audio"})
-        audio_path = tts_engine.generate_podcast_audio(
-            segments,
-            speaker1_voice=voice1,
-            speaker2_voice=voice2,
-            output_path=f"data/podcasts/{task_id}.wav"
-        )
-        
-        # Update task as completed
-        db.update_task(task_id, {
-            "status": "completed",
-            "audio_path": audio_path,
-            "transcript": segments
-        })
+        # Generate audio (if TTS available)
+        if tts_engine is not None:
+            db.update_task(task_id, {"status": "generating_audio"})
+            audio_path = tts_engine.generate_podcast_audio(
+                segments,
+                speaker1_voice=voice1,
+                speaker2_voice=voice2,
+                output_path=f"data/podcasts/{task_id}.wav"
+            )
+            db.update_task(task_id, {
+                "status": "completed",
+                "audio_path": audio_path,
+                "transcript": segments
+            })
+        else:
+            db.update_task(task_id, {
+                "status": "completed",
+                "transcript": segments,
+                "message": "TTS not available in this build"
+            })
         
     except Exception as e:
         db.update_task(task_id, {"status": "failed", "error": str(e)})

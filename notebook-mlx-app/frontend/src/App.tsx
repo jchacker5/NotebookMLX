@@ -9,15 +9,12 @@ import { Breadcrumb } from './components/Breadcrumb'
 function App() {
   const [activePanel] = useState<'chat' | 'studio'>('chat')
   const [currentView, setCurrentView] = useState<'notebooks' | 'notebook'>('notebooks')
-  const [currentNotebookId, setCurrentNotebookId] = useState<string | null>(null)
   const [currentNotebookTitle, setCurrentNotebookTitle] = useState<string>('')
 
   useEffect(() => {
     // Check if we're viewing a specific notebook
     const path = window.location.pathname
     if (path.startsWith('/notebook/')) {
-      const id = path.split('/notebook/')[1]
-      setCurrentNotebookId(id)
       setCurrentView('notebook')
       // In a real app, fetch the notebook title here
       setCurrentNotebookTitle('Machine Learning Research')
@@ -26,7 +23,6 @@ function App() {
 
   const handleBackToNotebooks = () => {
     setCurrentView('notebooks')
-    setCurrentNotebookId(null)
     window.history.pushState({}, '', '/')
   }
 

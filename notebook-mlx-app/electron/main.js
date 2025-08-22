@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, session } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 
@@ -18,6 +18,25 @@ function createWindow() {
     trafficLightPosition: { x: 15, y: 15 },
     backgroundColor: '#1a1a1a'
   });
+
+  // Apply a restrictive Content Security Policy
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-eval'", // Vite dev may require eval; disabled in prod build
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    "connect-src 'self' http://localhost:8000 http://127.0.0.1:8000",
+    "font-src 'self' data:",
+    "media-src 'self' blob: data:",
+  ].join('; ')
+
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const responseHeaders = {
+      ...details.responseHeaders,
+      'Content-Security-Policy': [csp],
+    }
+    callback({ responseHeaders })
+  })
 
   // Load the React app
   mainWindow.loadURL(
@@ -154,7 +173,34 @@ ipcMain.handle('dialog:openFile', async () => {
   return result;
 });
 
-icpMain.handle('dialog:saveFile', async (event, options) => {
+ipcMain.handle('dialog:saveFile', async (event, options) => {
   const result = await dialog.showSaveDialog(mainWindow, options);
   return result;
 });
+
+// Minimal API proxy with basic validation (optional)
+ipcMain.handle('api:request', async (event, payload) => {
+  try {
+    const { path, method = 'GET', body } = payload || {}
+    if (typeof path !== 'string' || !/^\/api\//.test(path)) {
+      throw new Error('Invalid API path')
+    }
+    const allowed = ['GET', 'POST']
+    if (!allowed.includes(String(method).toUpperCase())) {
+      throw new Error('Invalid method')
+    }
+    const res = await fetch(`http://localhost:8000${path}`, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    })
+    const ct = res.headers.get('content-type') || ''
+    if (ct.includes('application/json')) {
+      return await res.json()
+    }
+    const buf = await res.arrayBuffer()
+    return { status: res.status, body: Buffer.from(buf).toString('base64') }
+  } catch (e) {
+    return { error: String(e) }
+  }
+})
