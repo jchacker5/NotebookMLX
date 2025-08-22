@@ -1,12 +1,13 @@
-import { ArrowLeft, Settings, HelpCircle, User } from 'lucide-react'
+import { ArrowLeft, Settings, HelpCircle, User, Download } from 'lucide-react'
 
 interface HeaderProps {
   title: string
   onBack?: () => void
   showBack?: boolean
+  onExport?: () => void
 }
 
-export function Header({ title, onBack, showBack = false }: HeaderProps) {
+export function Header({ title, onBack, showBack = false, onExport }: HeaderProps) {
   return (
     <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6">
       <div className="flex items-center space-x-4">
@@ -22,6 +23,15 @@ export function Header({ title, onBack, showBack = false }: HeaderProps) {
       </div>
 
       <div className="flex items-center space-x-2">
+        {onExport && (
+          <button
+            onClick={onExport}
+            className="px-3 py-1.5 text-sm rounded bg-gray-100 hover:bg-gray-200 inline-flex items-center gap-2"
+          >
+            <Download className="h-4 w-4 text-gray-700" />
+            <span>Export</span>
+          </button>
+        )}
         <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
           <HelpCircle className="h-5 w-5 text-gray-600" />
         </button>

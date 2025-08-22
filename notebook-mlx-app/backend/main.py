@@ -330,10 +330,11 @@ async def export_podcast_zip(task_id: str):
                 from ml.rewriter import DEFAULT_MODEL as REWRITER_MODEL
             except Exception:
                 REWRITER_MODEL = None
-            model_meta["pdf_preprocess_model"] = PDF_PREPROCESS_MODEL or getattr(pdf_processor, 'model_name', None)
-            model_meta["transcript_model"] = TRANSCRIPT_MODEL or getattr(transcript_generator, 'model_name', None)
-            model_meta["rewriter_model"] = REWRITER_MODEL or getattr(rewriter, 'model_name', None)
-            model_meta["tts_model"] = getattr(tts_engine, 'model_name', None) if tts_engine is not None else None
+            model_meta["pdf_preprocess_model"] = PDF_PREPROCESS_MODEL or getattr(get_pdf_processor(), 'model_name', None)
+            model_meta["transcript_model"] = TRANSCRIPT_MODEL or getattr(get_transcript_generator(), 'model_name', None)
+            model_meta["rewriter_model"] = REWRITER_MODEL or getattr(get_rewriter(), 'model_name', None)
+            tts = get_tts_engine()
+            model_meta["tts_model"] = getattr(tts, 'model_name', None) if tts is not None else None
             zf.writestr('model_metadata.json', json.dumps(model_meta, indent=2))
 
             # Optional: include a cover asset if present
@@ -451,7 +452,7 @@ async def merge_chunks(file_id: str = Form(...), filename: str = Form(...)):
                 with open(cache_path, 'r', encoding='utf-8') as cf:
                     processed_text = cf.read()
             else:
-                processed_text = pdf_processor.process_pdf(merged_path)
+                processed_text = get_pdf_processor().process_pdf(merged_path)
                 with open(cache_path, 'w', encoding='utf-8') as cf:
                     cf.write(processed_text)
             db.add_source({
@@ -558,18 +559,19 @@ async def generate_podcast_task(task_id: str, text: str, voice1: str, voice2: st
         
         async with _GEN_SEMAPHORE:
             # Generate transcript
-            transcript = transcript_generator.generate_transcript(text)
-            segments = transcript_generator.parse_transcript(transcript)
+            transcript = get_transcript_generator().generate_transcript(text)
+            segments = get_transcript_generator().parse_transcript(transcript)
         
         # Enhance if requested
         if enhance:
             db.update_task(task_id, {"status": "enhancing_transcript"})
-            segments = rewriter.enhance_transcript(segments)
+            segments = get_rewriter().enhance_transcript(segments)
         
         # Generate audio (if TTS available)
-        if tts_engine is not None:
+        tts = get_tts_engine()
+        if tts is not None:
             db.update_task(task_id, {"status": "generating_audio"})
-            audio_path, segment_times = tts_engine.generate_podcast_audio(
+            audio_path, segment_times = tts.generate_podcast_audio(
                 segments,
                 speaker1_voice=voice1,
                 speaker2_voice=voice2,
@@ -617,7 +619,7 @@ async def generate_mindmap(request: MindMapRequest):
         concepts_prompt = f"Extract the main concepts and their relationships from this text as a mind map structure:\n\n{combined_text[:2000]}"
         
         # Generate mind map data (in production, use a dedicated concept extraction model)
-        mindmap_text = transcript_generator.generate_transcript(
+        mindmap_text = get_transcript_generator().generate_transcript(
             concepts_prompt,
             max_tokens=1024,
             temperature=0.5
@@ -642,11 +644,12 @@ async def generate_mindmap(request: MindMapRequest):
 async def synthesize_voice(request: VoiceSynthRequest):
     """Synthesize speech from text"""
     try:
-        if tts_engine is None:
+        tts = get_tts_engine()
+        if tts is None:
             raise HTTPException(status_code=503, detail="TTS engine not available")
         # Generate audio
         audio_path = f"data/tts/{uuid.uuid4()}.wav"
-        audio = tts_engine.generate_segment_audio(
+        audio = tts.generate_segment_audio(
             "User",
             request.text,
             voice_profile=request.voice_id
@@ -668,7 +671,8 @@ async def train_voice(
 ):
     """Train a custom voice model"""
     try:
-        if tts_engine is None:
+        tts = get_tts_engine()
+        if tts is None:
             return TrainVoiceResponse(status="error", voice_id=voice_name, message="TTS engine not available")
         # Save audio files
         audio_paths = []
@@ -677,7 +681,7 @@ async def train_voice(
             audio_paths.append(path)
         
         # Train voice (simplified - just using first file as reference)
-        result = tts_engine.train_voice(audio_paths, voice_name)
+        result = tts.train_voice(audio_paths, voice_name)
         
         return TrainVoiceResponse(**result)
         

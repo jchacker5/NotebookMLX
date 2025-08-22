@@ -25,7 +25,8 @@ try {
   const pipPath = path.join(pythonDistDir, 'venv', 'bin', 'pip');
   
   execSync(`${pipPath} install --upgrade pip --quiet`, { stdio: 'inherit' });
-  execSync(`${pipPath} install -r backend/requirements.txt`, { cwd: rootDir, stdio: 'inherit' });
+  // Install with optimizations: no cache to reduce size, compile bytecode
+  execSync(`${pipPath} install --no-cache-dir --compile -r backend/requirements.txt`, { cwd: rootDir, stdio: 'inherit' });
   
   // Copy backend code
   console.log('Copying backend code...');
@@ -38,7 +39,8 @@ try {
     for (const item of items) {
       if (item === 'venv' || item === '__pycache__' || item === '.env' || 
           item === '.git' || item === 'node_modules' || item === '.pytest_cache' ||
-          item.startsWith('.')) continue;
+          item === 'data' || item === 'models' || item === 'tests' ||
+          item.startsWith('.') || item.endsWith('.pyc')) continue;
       
       const srcPath = path.join(src, item);
       const destPath = path.join(dest, item);

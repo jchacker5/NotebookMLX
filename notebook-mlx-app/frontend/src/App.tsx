@@ -5,11 +5,13 @@ import { StudioPanel } from './components/StudioPanel'
 import { NotebooksPage } from './components/NotebooksPage'
 import { Header } from './components/Header'
 import { Breadcrumb } from './components/Breadcrumb'
+import { ExportModal } from './components/ExportModal'
 
 function App() {
-  const [activePanel] = useState<'chat' | 'studio'>('chat')
+  const [activePanel, setActivePanel] = useState<'chat' | 'studio'>('chat')
   const [currentView, setCurrentView] = useState<'notebooks' | 'notebook'>('notebooks')
   const [currentNotebookTitle, setCurrentNotebookTitle] = useState<string>('')
+  const [showExport, setShowExport] = useState(false)
 
   useEffect(() => {
     // Check if we're viewing a specific notebook
@@ -37,6 +39,7 @@ function App() {
         title={currentNotebookTitle}
         showBack={true}
         onBack={handleBackToNotebooks}
+        onExport={() => setShowExport(true)}
       />
       
       {/* Breadcrumb */}
@@ -64,8 +67,23 @@ function App() {
               <StudioPanel />
             )}
           </div>
+          <div className="border-t border-border p-2 flex items-center gap-2">
+            <button
+              onClick={() => setActivePanel('chat')}
+              className={`px-3 py-1.5 text-sm rounded ${activePanel === 'chat' ? 'bg-primary text-primary-foreground' : 'bg-secondary hover:bg-secondary/80'}`}
+            >
+              Chat
+            </button>
+            <button
+              onClick={() => setActivePanel('studio')}
+              className={`px-3 py-1.5 text-sm rounded ${activePanel === 'studio' ? 'bg-primary text-primary-foreground' : 'bg-secondary hover:bg-secondary/80'}`}
+            >
+              Studio
+            </button>
+          </div>
         </div>
       </div>
+      {showExport && <ExportModal onClose={() => setShowExport(false)} />}
     </div>
   )
 }
