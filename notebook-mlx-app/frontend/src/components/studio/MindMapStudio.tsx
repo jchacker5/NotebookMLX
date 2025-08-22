@@ -6,7 +6,7 @@ import { useMutation } from '@tanstack/react-query'
 // Import only needed D3 modules to reduce bundle size
 import { select } from 'd3-selection'
 import { hierarchy, tree } from 'd3-hierarchy'
-import { zoom } from 'd3-zoom'
+import * as d3 from 'd3'
 import { linkHorizontal } from 'd3-shape'
 
 interface MindMapNode {

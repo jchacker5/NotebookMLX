@@ -78,16 +78,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Structured logging
+# Structured logging (configured after data_dir is set below)
 logger = logging.getLogger("notebookmlx")
 logger.setLevel(logging.INFO)
-log_dir = Path(data_dir)
-log_dir.mkdir(parents=True, exist_ok=True)
-fh = RotatingFileHandler(log_dir / 'app.log', maxBytes=2_000_000, backupCount=3)
-sh = logging.StreamHandler()
-for h in (fh, sh):
-    h.setFormatter(logging.Formatter('%(message)s'))
-    logger.addHandler(h)
 
 # Prometheus metrics
 REQ_COUNT = Counter("http_requests_total", "Total HTTP requests", ["method", "path", "status"])
@@ -174,6 +167,16 @@ def get_tts_engine():
             logger.warning(f"TTS engine initialization failed: {e}")
             tts_engine = None
     return tts_engine
+
+# Configure logging handlers now that data_dir is known
+log_dir = Path(data_dir)
+log_dir.mkdir(parents=True, exist_ok=True)
+fh = RotatingFileHandler(log_dir / 'app.log', maxBytes=2_000_000, backupCount=3)
+sh = logging.StreamHandler()
+for h in (fh, sh):
+    h.setFormatter(logging.Formatter('%(message)s'))
+    if h not in logger.handlers:
+        logger.addHandler(h)
 
 # Simple in-memory rate limiter (per-IP per key)
 _rate_buckets = defaultdict(lambda: deque())
