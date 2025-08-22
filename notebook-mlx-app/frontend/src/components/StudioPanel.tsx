@@ -1,7 +1,8 @@
-import { useState, lazy, Suspense } from 'react'
+import { useState, lazy, Suspense, useEffect, useRef } from 'react'
 import { Settings, Play, Sparkles, Cpu, MessageSquare, FileVideo, BrainCircuit, Loader2, Download } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { ModelSelector } from './ModelSelector'
+import { useToast } from './Toast'
 
 // Lazy load heavy studio components to reduce initial bundle size
 const PodcastStudio = lazy(() => import('./studio/PodcastStudio').then(module => ({ default: module.PodcastStudio })))
@@ -40,16 +41,16 @@ export function StudioPanel() {
   })
   const { podcastTask } = useStore()
   const downloadsReady = Boolean(podcastTask && (podcastTask.status === 'completed' || podcastTask?.audio_path))
-  const { notify } = require('./Toast')
+  const { notify } = useToast()
   // Toast when task flips to completed
-  const prevStatusRef = (require('react') as any).useRef<string | null>(null)
-  ;(require('react') as any).useEffect(() => {
+  const prevStatusRef = useRef<string | null>(null)
+  useEffect(() => {
     const status = podcastTask?.status || null
     if (prevStatusRef.current && prevStatusRef.current !== 'completed' && status === 'completed') {
-      notify?.('Podcast generation completed')
+      notify('Podcast generation completed')
     }
     prevStatusRef.current = status
-  }, [podcastTask])
+  }, [podcastTask, notify])
 
   const studioOptions: StudioOption[] = [
     {
@@ -273,6 +274,7 @@ function DownloadsPanel() {
   const audioHref = taskId ? `/api/download/podcasts/${taskId}.wav` : undefined
   const videoHref = taskId ? `/api/download/videos/${taskId}.mp4` : undefined
   const zipHref = taskId ? `/api/export/podcast/${taskId}.zip` : undefined
+  const jsonHref = taskId ? `/api/export/podcast/${taskId}/segments.json` : undefined
   return (
     <div className="p-6">
       <h3 className="text-xl font-semibold mb-4">Downloads</h3>
@@ -285,6 +287,9 @@ function DownloadsPanel() {
         </a>
         <a className={`block p-3 border rounded ${!zipHref ? 'opacity-50 pointer-events-none' : 'hover:bg-black/5'}`} href={zipHref} download>
           Podcast export bundle (ZIP)
+        </a>
+        <a className={`block p-3 border rounded ${!jsonHref ? 'opacity-50 pointer-events-none' : 'hover:bg-black/5'}`} href={jsonHref} download>
+          Transcript + timings (JSON)
         </a>
       </div>
       {!taskId && (

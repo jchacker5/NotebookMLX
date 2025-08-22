@@ -17,6 +17,7 @@ Endpoints (selection)
 - `POST /api/export/chat-html` → generate an editable HTML transcript.
 - `POST /api/export/chat-md` → generate a Markdown transcript.
 - `GET /api/export/podcast/{task_id}.zip` → export podcast transcript, metadata, segments (with placeholder timestamps), model metadata, and audio (if available) as a ZIP. Includes `assets/icon.svg` as cover when available.
+- `GET /api/export/podcast/{task_id}/segments.json` → transcript and per-segment timings as JSON (developer export).
 
 Environment
 - `BACKEND_HOST`, `BACKEND_PORT`, `ALLOWED_ORIGINS`, `ALLOW_CREDENTIALS`.

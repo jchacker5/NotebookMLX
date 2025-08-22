@@ -10,7 +10,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 import uvicorn
 from dotenv import load_dotenv
@@ -432,6 +432,23 @@ async def export_podcast_zip(task_id: str, request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.get("/api/export/podcast/{task_id}/segments.json")
+async def export_podcast_segments(task_id: str, request: Request):
+    """Return transcript + segment timings as JSON for developer workflows"""
+    check_rate_limit(request, key='export', limit_per_min=int(os.getenv('EXPORT_RATE_LIMIT_PER_MIN', '60')))
+    task = db.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    data = task.get('data') or {}
+    payload = {
+        'task_id': task_id,
+        'transcript': data.get('transcript'),
+        'segment_times': data.get('segment_times'),
+        'audio_path': data.get('audio_path') or task.get('audio_path'),
+    }
+    return JSONResponse(content=payload)
+
 @app.post("/api/upload-source")
 async def upload_source(file: UploadFile = File(...)):
     """Upload and process a source file"""
@@ -459,8 +476,18 @@ async def upload_source(file: UploadFile = File(...)):
                 hasher.update(chunk)
         file_hash = hasher.hexdigest()
 
+        # Validate extension
+        allowed_exts = {'.pdf', '.txt', '.md'}
+        ext = Path(file.filename).suffix.lower()
+        if ext not in allowed_exts:
+            try:
+                os.remove(file_path)
+            except Exception:
+                pass
+            raise HTTPException(status_code=415, detail=f"Unsupported file type: {ext}")
+
         # Save uploaded file
-        if file.filename.endswith('.pdf'):
+        if ext == '.pdf':
             # Process PDF
             # Check cache first
             cache_path = file_manager.get_file_path("processed", file_hash + ".txt")
@@ -543,7 +570,15 @@ async def merge_chunks(file_id: str = Form(...), filename: str = Form(...)):
                     break
                 hasher.update(chunk)
         file_hash = hasher.hexdigest()
-        if filename.endswith('.pdf'):
+        ext = Path(filename).suffix.lower()
+        allowed_exts = {'.pdf', '.txt', '.md'}
+        if ext not in allowed_exts:
+            try:
+                os.remove(merged_path)
+            except Exception:
+                pass
+            raise HTTPException(status_code=415, detail=f"Unsupported file type: {ext}")
+        if ext == '.pdf':
             cache_path = file_manager.get_file_path("processed", file_hash + ".txt")
             if os.path.exists(cache_path):
                 with open(cache_path, 'r', encoding='utf-8') as cf:

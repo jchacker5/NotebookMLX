@@ -150,18 +150,22 @@ def test_export_chat_pdf_and_podcast_zip():
             ],
         },
     })
-    z = client.get(f'/api/export/podcast/{task_id}.zip')
+  z = client.get(f'/api/export/podcast/{task_id}.zip')
     assert z.status_code == 200
   assert 'application/zip' in z.headers.get('content-type', '')
     # Inspect contents
     import zipfile, io as _io
     buf = _io.BytesIO(z.content)
-    with zipfile.ZipFile(buf) as zf:
+  with zipfile.ZipFile(buf) as zf:
       names = set(zf.namelist())
       assert 'metadata.json' in names
       assert 'transcript.json' in names
       assert 'segments.json' in names
       assert 'model_metadata.json' in names
+  # segments.json direct endpoint
+  js = client.get(f'/api/export/podcast/{task_id}/segments.json')
+  assert js.status_code == 200
+  assert js.json().get('transcript')
 
 
 def test_export_chat_html_and_md():
