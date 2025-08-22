@@ -3,7 +3,11 @@ import { Download, Loader2, Brain } from 'lucide-react'
 import { useStore } from '../../store/useStore'
 import { generateMindMap } from '../../services/api'
 import { useMutation } from '@tanstack/react-query'
-import * as d3 from 'd3'
+// Import only needed D3 modules to reduce bundle size
+import { select } from 'd3-selection'
+import { hierarchy, tree } from 'd3-hierarchy'
+import { zoom } from 'd3-zoom'
+import { linkHorizontal } from 'd3-shape'
 
 interface MindMapNode {
   name: string
@@ -32,7 +36,7 @@ export function MindMapStudio({ selectedModel }: MindMapStudioProps) {
   }, [mindmapData])
 
   const renderMindMap = (data: MindMapNode) => {
-    const svg = d3.select(svgRef.current)
+    const svg = select(svgRef.current)
     svg.selectAll('*').remove()
 
     const width = svgRef.current!.clientWidth
@@ -42,22 +46,22 @@ export function MindMapStudio({ selectedModel }: MindMapStudioProps) {
       .append('g')
       .attr('transform', `translate(${width / 2},${height / 2})`)
 
-    const tree = d3.tree<MindMapNode>()
+    const treeLayout = tree<MindMapNode>()
       .size([2 * Math.PI, Math.min(width, height) / 2 - 100])
       .separation((a, b) => (a.parent == b.parent ? 1 : 2) / a.depth)
 
-    const root = d3.hierarchy(data)
-    tree(root as any)
+    const root = hierarchy(data)
+    treeLayout(root as any)
 
-    // Links
+    // Links - using simplified linear links instead of radial for better performance
     g.selectAll('.link')
       .data(root.links())
       .enter()
       .append('path')
       .attr('class', 'link')
-      .attr('d', d3.linkRadial<any, any>()
-        .angle(d => d.x)
-        .radius(d => d.y))
+      .attr('d', linkHorizontal<any, any>()
+        .x(d => d.y * Math.cos(d.x - Math.PI / 2))
+        .y(d => d.y * Math.sin(d.x - Math.PI / 2)))
       .style('fill', 'none')
       .style('stroke', '#4a5568')
       .style('stroke-width', 1.5)

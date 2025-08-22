@@ -117,16 +117,59 @@ async def add_observability(request: Request, call_next):
         }
         logger.info(json.dumps(log))
 
-# Initialize components
+# Initialize lightweight components first
 data_dir = os.getenv("BACKEND_DATA_DIR", "data")
 Path(data_dir).mkdir(parents=True, exist_ok=True)
 db = Database(db_path=str(Path(data_dir) / "notebookmlx.db"))
 file_manager = FileManager(base_path=data_dir)
-pdf_processor = PDFProcessor()
-transcript_generator = TranscriptGenerator()
-rewriter = Rewriter()
-# tts_engine = TTSEngine()  # Temporarily disabled
-tts_engine = None  # Placeholder
+
+# Lazy initialization of ML models to improve startup time
+pdf_processor = None
+transcript_generator = None
+rewriter = None
+tts_engine = None
+
+def get_pdf_processor():
+    """Lazy load PDF processor when needed"""
+    global pdf_processor
+    if pdf_processor is None:
+        if DISABLE_ML:
+            pdf_processor = PDFProcessor()  # Stub version
+        else:
+            pdf_processor = PDFProcessor()
+    return pdf_processor
+
+def get_transcript_generator():
+    """Lazy load transcript generator when needed"""
+    global transcript_generator
+    if transcript_generator is None:
+        if DISABLE_ML:
+            transcript_generator = TranscriptGenerator()  # Stub version
+        else:
+            transcript_generator = TranscriptGenerator()
+    return transcript_generator
+
+def get_rewriter():
+    """Lazy load rewriter when needed"""
+    global rewriter
+    if rewriter is None:
+        if DISABLE_ML:
+            rewriter = Rewriter()  # Stub version
+        else:
+            rewriter = Rewriter()
+    return rewriter
+
+def get_tts_engine():
+    """Lazy load TTS engine when needed"""
+    global tts_engine
+    if tts_engine is None and not DISABLE_ML:
+        try:
+            from ml.tts_engine import TTSEngine
+            tts_engine = TTSEngine()
+        except Exception as e:
+            logger.warning(f"TTS engine initialization failed: {e}")
+            tts_engine = None
+    return tts_engine
 
 # Pydantic models
 class ChatRequest(BaseModel):
@@ -246,8 +289,9 @@ async def export_podcast_zip(task_id: str):
             if audio_path and os.path.exists(audio_path):
                 zf.write(audio_path, arcname=os.path.join('audio', os.path.basename(audio_path)))
 
-            # Add segments with placeholder timestamps if transcript available
+            # Add segments with timestamps if available
             if transcript and isinstance(transcript, list):
+                seg_times = data.get('segment_times')
                 segs = []
                 for idx, seg in enumerate(transcript):
                     if isinstance(seg, (list, tuple)) and len(seg) == 2:
@@ -256,11 +300,19 @@ async def export_podcast_zip(task_id: str):
                         speaker, text = seg.get('speaker', ''), seg.get('text', '')
                     else:
                         speaker, text = '', str(seg)
+                    start = end = None
+                    if isinstance(seg_times, list) and idx < len(seg_times):
+                        try:
+                            start = float(seg_times[idx].get('start'))
+                            end = float(seg_times[idx].get('end'))
+                        except Exception:
+                            start = end = None
                     segs.append({
                         "index": idx,
                         "speaker": speaker,
                         "text": text,
-                        "timestamp": None,
+                        "start": start,
+                        "end": end,
                     })
                 zf.writestr('segments.json', json.dumps(segs, indent=2))
 
@@ -326,7 +378,7 @@ async def upload_source(file: UploadFile = File(...)):
                 with open(cache_path, 'r', encoding='utf-8') as cf:
                     processed_text = cf.read()
             else:
-                processed_text = pdf_processor.process_pdf(file_path)
+                processed_text = get_pdf_processor().process_pdf(file_path)
                 with open(cache_path, 'w', encoding='utf-8') as cf:
                     cf.write(processed_text)
             
@@ -441,7 +493,7 @@ async def chat_with_sources(request: ChatRequest):
         
         # Generate response using transcript generator (reusing the model)
         # In production, you'd want a dedicated chat model
-        response_text = transcript_generator.generate_transcript(
+        response_text = get_transcript_generator().generate_transcript(
             f"Context: {context}\n\nQuestion: {request.message}\n\nProvide a detailed answer:",
             max_tokens=1024,
             temperature=0.7
@@ -517,7 +569,7 @@ async def generate_podcast_task(task_id: str, text: str, voice1: str, voice2: st
         # Generate audio (if TTS available)
         if tts_engine is not None:
             db.update_task(task_id, {"status": "generating_audio"})
-            audio_path = tts_engine.generate_podcast_audio(
+            audio_path, segment_times = tts_engine.generate_podcast_audio(
                 segments,
                 speaker1_voice=voice1,
                 speaker2_voice=voice2,
@@ -526,7 +578,8 @@ async def generate_podcast_task(task_id: str, text: str, voice1: str, voice2: st
             db.update_task(task_id, {
                 "status": "completed",
                 "audio_path": audio_path,
-                "transcript": segments
+                "transcript": segments,
+                "segment_times": segment_times
             })
         else:
             db.update_task(task_id, {

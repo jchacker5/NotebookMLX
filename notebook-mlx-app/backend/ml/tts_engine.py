@@ -99,9 +99,16 @@ class TTSEngine:
                              speed: float = 1.0,
                              output_path: str = "podcast.wav",
                              add_pauses: bool = True) -> str:
-        """Generate complete podcast audio from segments"""
+        """Generate complete podcast audio from segments.
+
+        Returns the output path and a list of timing entries for each spoken segment:
+        [{"index", "speaker", "start", "end"}]
+        """
         audio_segments = []
+        timings = []
+        t = 0.0
         
+        seg_idx = 0
         for i, (speaker, text) in enumerate(segments):
             # Skip non-speech segments
             if "[" in text and "]" in text:
@@ -115,6 +122,15 @@ class TTSEngine:
             
             if len(audio) > 0:
                 audio_segments.append(audio)
+                duration = len(audio) / float(self.sample_rate)
+                timings.append({
+                    "index": seg_idx,
+                    "speaker": speaker,
+                    "start": t,
+                    "end": t + duration,
+                })
+                t += duration
+                seg_idx += 1
                 
                 # Add natural pause between segments
                 if add_pauses and i < len(segments) - 1:
@@ -126,14 +142,15 @@ class TTSEngine:
                     
                     pause = np.zeros(pause_duration, dtype=np.float32)
                     audio_segments.append(pause)
+                    t += pause_duration / float(self.sample_rate)
         
         # Concatenate all audio segments
         if audio_segments:
             final_audio = np.concatenate(audio_segments)
             sf.write(output_path, final_audio, self.sample_rate)
-            return output_path
+            return output_path, timings
         
-        return None
+        return None, []
     
     def add_custom_voice(self, voice_id: str, reference_audio_path: str, 
                         reference_text: str = "This is a reference audio for voice cloning."):

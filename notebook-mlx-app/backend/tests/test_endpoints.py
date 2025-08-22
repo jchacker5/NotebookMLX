@@ -115,3 +115,41 @@ def test_tts_endpoints_guarded():
     assert sv.status_code == 503
     tv = client.post('/api/train-voice', files={'voice_name': (None, 'v1'), 'audio_files': ('a.wav', io.BytesIO(b'00'), 'audio/wav')})
     assert tv.status_code in (200, 503)
+
+
+def test_export_chat_pdf_and_podcast_zip():
+    os.environ.setdefault('DISABLE_ML_IMPORTS', '1')
+    import main as app_module
+    tmpdir = setup_temp_env(app_module)
+    client = TestClient(app_module.app)
+
+    # Chat PDF export
+    payload = {
+        'title': 'Unit Test Export',
+        'messages': [
+            {'role': 'user', 'content': 'Hello'},
+            {'role': 'assistant', 'content': 'World'},
+        ],
+    }
+    pdf = client.post('/api/export/chat-pdf', json=payload)
+    assert pdf.status_code == 200
+    assert 'application/pdf' in pdf.headers.get('content-type', '')
+
+    # Seed a task for podcast ZIP export
+    task_id = 'task_zip_1'
+    app_module.db.add_task({
+        'id': task_id,
+        'type': 'podcast_generation',
+        'status': 'completed',
+        'data': {
+            'transcript': [['Speaker 1', 'Hello'], ['Speaker 2', 'Hi']],
+            'audio_path': None,
+            'segment_times': [
+                {'index': 0, 'speaker': 'Speaker 1', 'start': 0.0, 'end': 1.0},
+                {'index': 1, 'speaker': 'Speaker 2', 'start': 1.0, 'end': 2.0},
+            ],
+        },
+    })
+    z = client.get(f'/api/export/podcast/{task_id}.zip')
+    assert z.status_code == 200
+    assert 'application/zip' in z.headers.get('content-type', '')

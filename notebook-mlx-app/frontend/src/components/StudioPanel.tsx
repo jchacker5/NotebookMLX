@@ -1,12 +1,24 @@
-import { useState } from 'react'
-import { Settings, Play, Sparkles, Cpu, MessageSquare, FileVideo, BrainCircuit } from 'lucide-react'
-import { PodcastStudio } from './studio/PodcastStudio'
-import { MindMapStudio } from './studio/MindMapStudio'
-import { VoiceStudio } from './studio/VoiceStudio'
-import { VideoStudio } from './studio/VideoStudio'
+import { useState, lazy, Suspense } from 'react'
+import { Settings, Play, Sparkles, Cpu, MessageSquare, FileVideo, BrainCircuit, Loader2, Download } from 'lucide-react'
 import { ModelSelector } from './ModelSelector'
 
-type StudioTab = 'podcast' | 'mindmap' | 'video' | 'voice' | 'settings'
+// Lazy load heavy studio components to reduce initial bundle size
+const PodcastStudio = lazy(() => import('./studio/PodcastStudio').then(module => ({ default: module.PodcastStudio })))
+const MindMapStudio = lazy(() => import('./studio/MindMapStudio').then(module => ({ default: module.MindMapStudio })))
+const VideoStudio = lazy(() => import('./studio/VideoStudio').then(module => ({ default: module.VideoStudio })))
+const VoiceStudio = lazy(() => import('./studio/VoiceStudio').then(module => ({ default: module.VoiceStudio })))
+
+// Loading fallback component
+const StudioLoading = () => (
+  <div className="flex items-center justify-center h-64">
+    <div className="flex items-center gap-2 text-muted-foreground">
+      <Loader2 className="w-5 h-5 animate-spin" />
+      <span>Loading studio...</span>
+    </div>
+  </div>
+)
+
+type StudioTab = 'podcast' | 'mindmap' | 'video' | 'voice' | 'downloads' | 'settings'
 
 interface StudioOption {
   id: StudioTab
@@ -36,6 +48,13 @@ export function StudioPanel() {
       color: 'bg-blue-50 border-blue-200 text-blue-800'
     },
     {
+      id: 'downloads',
+      title: 'Downloads',
+      description: 'Export audio, video and bundles',
+      icon: <Download className="h-5 w-5" />,
+      color: 'bg-gray-50 border-gray-200 text-gray-800'
+    },
+    {
       id: 'mindmap',
       title: 'Study guide',
       description: 'Interactive mind map of key concepts',
@@ -62,13 +81,31 @@ export function StudioPanel() {
   const renderStudioContent = () => {
     switch (activeTab) {
       case 'podcast':
-        return <PodcastStudio selectedModels={selectedModels} />
+        return (
+          <Suspense fallback={<StudioLoading />}>
+            <PodcastStudio selectedModels={selectedModels} />
+          </Suspense>
+        )
       case 'mindmap':
-        return <MindMapStudio selectedModel={selectedModels.transcript} />
+        return (
+          <Suspense fallback={<StudioLoading />}>
+            <MindMapStudio selectedModel={selectedModels.transcript} />
+          </Suspense>
+        )
       case 'video':
-        return <VideoStudio selectedModels={selectedModels} />
+        return (
+          <Suspense fallback={<StudioLoading />}>
+            <VideoStudio selectedModels={selectedModels} />
+          </Suspense>
+        )
       case 'voice':
-        return <VoiceStudio selectedModel={selectedModels.tts} />
+        return (
+          <Suspense fallback={<StudioLoading />}>
+            <VoiceStudio selectedModel={selectedModels.tts} />
+          </Suspense>
+        )
+      case 'downloads':
+        return <DownloadsPanel />
       case 'settings':
         return (
           <div className="space-y-6">
@@ -201,6 +238,33 @@ export function StudioPanel() {
       <div className="flex-1 overflow-hidden">
         {renderStudioContent()}
       </div>
+    </div>
+  )
+}
+
+function DownloadsPanel() {
+  const { podcastTask } = require('../store/useStore').useStore.getState()
+  const taskId = podcastTask?.task_id
+  const audioHref = taskId ? `/api/download/podcasts/${taskId}.wav` : undefined
+  const videoHref = taskId ? `/api/download/videos/${taskId}.mp4` : undefined
+  const zipHref = taskId ? `/api/export/podcast/${taskId}.zip` : undefined
+  return (
+    <div className="p-6">
+      <h3 className="text-xl font-semibold mb-4">Downloads</h3>
+      <div className="space-y-3">
+        <a className={`block p-3 border rounded ${!audioHref ? 'opacity-50 pointer-events-none' : 'hover:bg-black/5'}`} href={audioHref} download>
+          Podcast audio (WAV)
+        </a>
+        <a className={`block p-3 border rounded ${!videoHref ? 'opacity-50 pointer-events-none' : 'hover:bg-black/5'}`} href={videoHref} download>
+          Video (MP4)
+        </a>
+        <a className={`block p-3 border rounded ${!zipHref ? 'opacity-50 pointer-events-none' : 'hover:bg-black/5'}`} href={zipHref} download>
+          Podcast export bundle (ZIP)
+        </a>
+      </div>
+      {!taskId && (
+        <p className="text-sm text-muted-foreground mt-4">No podcast task found yet. Generate a podcast to enable downloads.</p>
+      )}
     </div>
   )
 }
