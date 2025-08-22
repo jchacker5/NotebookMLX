@@ -24,6 +24,8 @@ Environment
 - `GEN_CONCURRENCY` to limit concurrent generation.
   - When TTS is disabled, `/api/synthesize-voice` and `/api/train-voice` return 503/error.
 - `BACKEND_DATA_DIR` to control where DB and media are written (defaults to `data/`). Electron sets this to the OS user data dir.
+- `BACKEND_MAX_UPLOAD_MB` (default 200) to limit single upload size; `BACKEND_MAX_CHUNK_MB` (default 16) to limit per-chunk size.
+- `EXPORT_RATE_LIMIT_PER_MIN` (default 60) rate-limits export endpoints per IP.
 
 Observability
 - JSON logs to `data/app.log` (rotated). Prometheus counters/histograms per route.

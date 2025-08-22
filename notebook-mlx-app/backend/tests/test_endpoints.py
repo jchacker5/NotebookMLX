@@ -152,7 +152,7 @@ def test_export_chat_pdf_and_podcast_zip():
     })
     z = client.get(f'/api/export/podcast/{task_id}.zip')
     assert z.status_code == 200
-    assert 'application/zip' in z.headers.get('content-type', '')
+  assert 'application/zip' in z.headers.get('content-type', '')
     # Inspect contents
     import zipfile, io as _io
     buf = _io.BytesIO(z.content)
@@ -162,3 +162,22 @@ def test_export_chat_pdf_and_podcast_zip():
       assert 'transcript.json' in names
       assert 'segments.json' in names
       assert 'model_metadata.json' in names
+
+
+def test_export_chat_html_and_md():
+  os.environ.setdefault('DISABLE_ML_IMPORTS', '1')
+  from main import app
+  client = TestClient(app)
+  payload = {
+    'title': 'Hello',
+    'messages': [
+      {'role': 'user', 'content': 'Hi'},
+      {'role': 'assistant', 'content': 'Yo'},
+    ]
+  }
+  h = client.post('/api/export/chat-html', json=payload)
+  assert h.status_code == 200
+  assert 'text/html' in h.headers.get('content-type', '')
+  m = client.post('/api/export/chat-md', json=payload)
+  assert m.status_code == 200
+  assert 'text/markdown' in m.headers.get('content-type', '')

@@ -39,7 +39,17 @@ export function StudioPanel() {
     pdf_processor: 'mlx-community/Qwen2.5-1.5B-Instruct-4bit'
   })
   const { podcastTask } = useStore()
-  const downloadsReady = Boolean(podcastTask && (podcastTask.status === 'completed' || podcastTask.audio_path))
+  const downloadsReady = Boolean(podcastTask && (podcastTask.status === 'completed' || podcastTask?.audio_path))
+  const { notify } = require('./Toast')
+  // Toast when task flips to completed
+  const prevStatusRef = (require('react') as any).useRef<string | null>(null)
+  ;(require('react') as any).useEffect(() => {
+    const status = podcastTask?.status || null
+    if (prevStatusRef.current && prevStatusRef.current !== 'completed' && status === 'completed') {
+      notify?.('Podcast generation completed')
+    }
+    prevStatusRef.current = status
+  }, [podcastTask])
 
   const studioOptions: StudioOption[] = [
     {
@@ -198,10 +208,13 @@ export function StudioPanel() {
             {downloadsReady && (
               <button
                 onClick={() => setActiveTab('downloads')}
-                className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 border border-green-200 hover:bg-green-200"
+                className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 border border-green-200 hover:bg-green-200 inline-flex items-center gap-1"
                 title="Downloads ready"
               >
-                Downloads ready
+                Downloads
+                <span className="ml-1 inline-flex items-center justify-center w-4 h-4 text-[10px] rounded-full bg-green-600 text-white">
+                  {Number(Boolean(podcastTask?.audio_path)) + Number(Boolean(podcastTask?.video_path)) + 1}
+                </span>
               </button>
             )}
             <button

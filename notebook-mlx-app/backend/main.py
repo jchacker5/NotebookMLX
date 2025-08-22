@@ -27,6 +27,7 @@ import base64
 import io
 import tempfile
 import zipfile
+from collections import defaultdict, deque
 
 DISABLE_ML = os.getenv("DISABLE_ML_IMPORTS", "0") == "1"
 if not DISABLE_ML:
@@ -174,6 +175,21 @@ def get_tts_engine():
             tts_engine = None
     return tts_engine
 
+# Simple in-memory rate limiter (per-IP per key)
+_rate_buckets = defaultdict(lambda: deque())
+def check_rate_limit(request: Request, key: str, limit_per_min: int) -> None:
+    # Identify client
+    ip = request.client.host if request and request.client else 'local'
+    bucket_key = f"{key}:{ip}"
+    q = _rate_buckets[bucket_key]
+    now = time.time()
+    # Remove entries older than 60s
+    while q and now - q[0] > 60:
+        q.popleft()
+    if len(q) >= limit_per_min:
+        raise HTTPException(status_code=429, detail="Too many requests, slow down")
+    q.append(now)
+
 # Pydantic models
 class ChatRequest(BaseModel):
     message: str
@@ -235,9 +251,10 @@ async def metrics():
 
 
 @app.post("/api/export/chat-pdf")
-async def export_chat_pdf(payload: ChatExportRequest):
+async def export_chat_pdf(payload: ChatExportRequest, request: Request):
     """Generate a PDF from chat messages and return it"""
     try:
+        check_rate_limit(request, key='export', limit_per_min=int(os.getenv('EXPORT_RATE_LIMIT_PER_MIN', '60')))
         fd, tmp_path = tempfile.mkstemp(suffix=".pdf")
         os.close(fd)
         c = canvas.Canvas(tmp_path, pagesize=letter)
@@ -282,8 +299,9 @@ async def export_chat_pdf(payload: ChatExportRequest):
 
 
 @app.post("/api/export/chat-html")
-async def export_chat_html(payload: ChatExportRequest):
+async def export_chat_html(payload: ChatExportRequest, request: Request):
     try:
+        check_rate_limit(request, key='export', limit_per_min=int(os.getenv('EXPORT_RATE_LIMIT_PER_MIN', '60')))
         html = ["<html><head><meta charset='utf-8'><title>{}</title></head><body>".format(payload.title)]
         html.append(f"<h1>{payload.title}</h1>")
         for m in payload.messages:
@@ -303,8 +321,9 @@ async def export_chat_html(payload: ChatExportRequest):
 
 
 @app.post("/api/export/chat-md")
-async def export_chat_md(payload: ChatExportRequest):
+async def export_chat_md(payload: ChatExportRequest, request: Request):
     try:
+        check_rate_limit(request, key='export', limit_per_min=int(os.getenv('EXPORT_RATE_LIMIT_PER_MIN', '60')))
         lines = [f"# {payload.title}", ""]
         for m in payload.messages:
             role = (m.role or '').capitalize()
@@ -323,8 +342,9 @@ async def export_chat_md(payload: ChatExportRequest):
 
 
 @app.get("/api/export/podcast/{task_id}.zip")
-async def export_podcast_zip(task_id: str):
+async def export_podcast_zip(task_id: str, request: Request):
     """Export podcast transcript, metadata, and audio (if available) as a ZIP"""
+    check_rate_limit(request, key='export', limit_per_min=int(os.getenv('EXPORT_RATE_LIMIT_PER_MIN', '60')))
     task = db.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -419,6 +439,15 @@ async def upload_source(file: UploadFile = File(...)):
         # Save uploaded file
         source_id = str(uuid.uuid4())
         file_path = await file_manager.save_upload(file, source_id)
+        # Enforce upload size limit
+        max_mb = int(os.getenv('BACKEND_MAX_UPLOAD_MB', '200'))
+        size_mb = os.path.getsize(file_path) / (1024 * 1024)
+        if size_mb > max_mb:
+            try:
+                os.remove(file_path)
+            except Exception:
+                pass
+            raise HTTPException(status_code=413, detail=f"File too large. Max {max_mb}MB")
 
         # Compute file hash for caching from saved file
         hasher = hashlib.sha256()
@@ -485,7 +514,15 @@ async def upload_chunk(
     chunk: UploadFile = File(...),
 ):
     try:
-        await file_manager.save_chunk(file_id, int(chunk_index), chunk)
+        path = await file_manager.save_chunk(file_id, int(chunk_index), chunk)
+        # Enforce per-chunk size limit
+        max_chunk_mb = int(os.getenv('BACKEND_MAX_CHUNK_MB', '16'))
+        if os.path.getsize(path) > max_chunk_mb * 1024 * 1024:
+            try:
+                os.remove(path)
+            except Exception:
+                pass
+            raise HTTPException(status_code=413, detail=f"Chunk too large. Max {max_chunk_mb}MB")
         return {"status": "ok"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

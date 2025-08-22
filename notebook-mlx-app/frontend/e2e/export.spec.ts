@@ -23,3 +23,14 @@ test('export modal triggers chat PDF request', async ({ page }) => {
   await expect.poll(() => called).toBeTruthy()
 })
 
+test('export modal triggers chat Markdown request', async ({ page }) => {
+  let called = false
+  await page.route('**/api/export/chat-md', async (route) => {
+    called = true
+    await route.fulfill({ status: 200, contentType: 'text/markdown', body: 'MD' })
+  })
+  await page.goto('/notebook/1')
+  await page.getByRole('button', { name: /Export/i }).click()
+  await page.getByRole('button', { name: /Export chat as Markdown/i }).click()
+  await expect.poll(() => called).toBeTruthy()
+})

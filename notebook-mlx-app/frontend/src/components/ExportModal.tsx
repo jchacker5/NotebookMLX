@@ -9,11 +9,18 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
   const { notify } = useToast()
   const [title, setTitle] = useState('Chat Export')
   const [coverDataUrl, setCoverDataUrl] = useState<string | undefined>(undefined)
+  const [mdFilename, setMdFilename] = useState('chat_export')
+  const [includeCitations, setIncludeCitations] = useState(false)
 
-  const chatForExport = useMemo(
-    () => messages.map((m) => ({ role: m.role, content: m.content })),
-    [messages],
-  )
+  const chatForExport = useMemo(() => {
+    return messages.map((m) => ({
+      role: m.role,
+      content:
+        includeCitations && m.citations && m.citations.length > 0
+          ? `${m.content}\n\nSources: ${m.citations.map((c) => c.filename).join(', ')}`
+          : m.content,
+    }))
+  }, [messages, includeCitations])
 
   const handleExportChatPdf = async () => {
     const blob = await exportChatPdf(title || 'Chat Export', chatForExport, coverDataUrl)
@@ -65,6 +72,10 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
               placeholder="Chat Export"
               className="w-full px-3 py-2 border rounded"
             />
+            <div className="flex items-center gap-2 mt-2">
+              <input id="inc-cites" type="checkbox" checked={includeCitations} onChange={(e) => setIncludeCitations(e.target.checked)} />
+              <label htmlFor="inc-cites" className="text-sm">Include citations</label>
+            </div>
             <label className="block text-sm font-medium mt-2">Optional cover image</label>
             <input
               type="file"
@@ -97,7 +108,7 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
               const url = URL.createObjectURL(blob)
               const a = document.createElement('a')
               a.href = url
-              a.download = `${(title || 'chat_export').replace(/\s+/g, '_').toLowerCase()}.md`
+              a.download = `${(mdFilename || 'chat_export').replace(/\s+/g, '_').toLowerCase()}.md`
               a.click()
               URL.revokeObjectURL(url)
               notify('Chat Markdown exported')
@@ -105,6 +116,26 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
             className="w-full flex items-center gap-3 p-3 border rounded hover:bg-black/5"
           >
             <FileText className="w-5 h-5" /> Export chat as Markdown
+          </button>
+          <div className="flex items-center gap-2">
+            <label className="text-sm">Markdown filename</label>
+            <input value={mdFilename} onChange={(e) => setMdFilename(e.target.value)} className="flex-1 px-3 py-2 border rounded" />
+          </div>
+          <button
+            onClick={() => {
+              const payload = { title, messages: chatForExport }
+              const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = `${(title || 'chat_export').replace(/\s+/g, '_').toLowerCase()}.json`
+              a.click()
+              URL.revokeObjectURL(url)
+              notify('Chat JSON exported')
+            }}
+            className="w-full flex items-center gap-3 p-3 border rounded hover:bg-black/5"
+          >
+            <FileText className="w-5 h-5" /> Export chat as JSON
           </button>
 
           <div className="grid grid-cols-1 gap-3">
