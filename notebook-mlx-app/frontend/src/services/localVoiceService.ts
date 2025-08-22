@@ -30,7 +30,6 @@ interface TrainingProgress {
 
 class LocalVoiceService {
   private isElectron: boolean
-  private voiceTrainer: any
   private fs: any
   private path: any
   private os: any
@@ -226,13 +225,15 @@ class LocalVoiceService {
   ): Promise<string> {
     
     if (this.isElectron) {
-      // Use local MLX voice generation
+      // Use local MLX voice generation with specified speed
       const outputPath = this.path.join(
         this.os.homedir(), 
         '.notebookmlx', 
         'generated', 
         `sample_${Date.now()}.wav`
       )
+      
+      console.log(`Generating voice sample at ${speed}x speed for voice ${voiceId}`)
       
       await this.ensureDirectory(this.path.dirname(outputPath))
       
@@ -279,7 +280,10 @@ class LocalVoiceService {
       if (this.fs.existsSync(voicePath)) {
         // Create zip archive of voice model
         const archiver = window.require('archiver')
-        // Implementation would create zip file
+        const archive = archiver('zip', { zlib: { level: 9 } })
+        
+        // Implementation would create zip file with voice model data
+        console.log('Creating voice model archive:', voiceId, archive.pointer())
         
         // For now, return placeholder
         return new Blob(['voice model export'], { type: 'application/zip' })

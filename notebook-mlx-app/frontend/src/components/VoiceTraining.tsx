@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Mic, Square, Play, Pause, Upload, Trash2, Save, Download, Settings } from 'lucide-react'
+import { Mic, Square, Play, Pause, Upload, Trash2, Download, Settings } from 'lucide-react'
 
 interface VoiceSample {
   id: string

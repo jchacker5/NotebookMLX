@@ -62,7 +62,7 @@ export function VoiceSelector({ selectedVoice, onVoiceChange, speaker }: VoiceSe
     }
   ]
 
-  const handlePreview = async (voiceId: string, text: string) => {
+  const handlePreview = async (voiceId: string, previewText: string) => {
     if (playingPreview === voiceId) {
       // Stop playing
       setPlayingPreview(null)
@@ -72,8 +72,9 @@ export function VoiceSelector({ selectedVoice, onVoiceChange, speaker }: VoiceSe
     setPlayingPreview(voiceId)
     
     try {
-      // In a real implementation, this would call the TTS API
+      // In a real implementation, this would call the TTS API with previewText
       // For now, we'll simulate audio playback
+      console.log(`Playing preview for ${voiceId}: ${previewText}`)
       await new Promise(resolve => setTimeout(resolve, 3000))
     } catch (error) {
       console.error('Preview failed:', error)

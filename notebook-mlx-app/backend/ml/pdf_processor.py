@@ -57,32 +57,76 @@ class PDFProcessor:
         return True
     
     def extract_text_from_pdf(self, file_path: str, max_chars: int = 100000) -> Optional[str]:
-        """Extract text from PDF file"""
+        """Extract text from PDF file with improved error handling"""
         self.validate_pdf(file_path)
         
         try:
             with open(file_path, 'rb') as file:
                 pdf_reader = PyPDF2.PdfReader(file)
+                
+                # Check if PDF is encrypted
+                if pdf_reader.is_encrypted:
+                    try:
+                        pdf_reader.decrypt("")  # Try empty password
+                    except Exception:
+                        raise ValueError("PDF is password protected and cannot be processed")
+                
                 num_pages = len(pdf_reader.pages)
+                if num_pages == 0:
+                    raise ValueError("PDF contains no pages")
                 
                 extracted_text = []
                 total_chars = 0
                 
+                print(f"Processing {num_pages} pages from {os.path.basename(file_path)}")
+                
                 for page_num in range(num_pages):
-                    page = pdf_reader.pages[page_num]
-                    text = page.extract_text() or ""
-                    if total_chars + len(text) > max_chars:
-                        remaining_chars = max_chars - total_chars
-                        extracted_text.append(text[:remaining_chars])
-                        break
-                    
-                    extracted_text.append(text)
-                    total_chars += len(text)
+                    try:
+                        page = pdf_reader.pages[page_num]
+                        text = page.extract_text() or ""
+                        
+                        # Clean up common PDF extraction artifacts
+                        text = self._clean_extracted_text(text)
+                        
+                        if total_chars + len(text) > max_chars:
+                            remaining_chars = max_chars - total_chars
+                            if remaining_chars > 0:
+                                extracted_text.append(text[:remaining_chars])
+                            break
+                        
+                        extracted_text.append(text)
+                        total_chars += len(text)
+                        
+                    except Exception as e:
+                        print(f"Warning: Could not extract text from page {page_num + 1}: {e}")
+                        continue
                 
-                return '\n'.join(extracted_text)
+                result = '\n'.join(extracted_text)
+                if not result.strip():
+                    raise ValueError("No text could be extracted from the PDF")
                 
-        except PdfReadError:
-            raise ValueError("Invalid or corrupted PDF file")
+                return result
+                
+        except PdfReadError as e:
+            raise ValueError(f"Invalid or corrupted PDF file: {e}")
+        except Exception as e:
+            raise ValueError(f"Error processing PDF: {e}")
+    
+    def _clean_extracted_text(self, text: str) -> str:
+        """Clean common PDF extraction artifacts"""
+        import re
+        
+        # Remove excessive whitespace
+        text = re.sub(r'\s+', ' ', text)
+        
+        # Remove common PDF artifacts
+        text = re.sub(r'[^\w\s\.,!?;:()\-\'""]', ' ', text)
+        
+        # Fix common spacing issues
+        text = re.sub(r'\s+([,.!?;:])', r'\1', text)
+        text = re.sub(r'([.!?])\s*([A-Z])', r'\1 \2', text)
+        
+        return text.strip()
     
     def create_word_bounded_chunks(self, text: str, target_chunk_size: int = 1000) -> List[str]:
         """Split text into chunks at word boundaries"""

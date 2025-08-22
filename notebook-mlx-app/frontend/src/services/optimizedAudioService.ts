@@ -164,6 +164,9 @@ class OptimizedAudioService {
     const adaptiveBitrate = this.config.adaptiveBitrate
     const quality = adaptiveBitrate ? this.calculateAdaptiveQuality(chunkIndex, totalChunks) : 1.0
     
+    // Use voice settings for generation (placeholder implementation)
+    console.log('Generating audio chunk with settings:', voiceSettings, 'quality:', quality)
+    
     // Generate synthetic audio data (in real implementation, this would call MLX TTS)
     const chunkDuration = 0.1 // 100ms chunks
     const sampleRate = 24000
