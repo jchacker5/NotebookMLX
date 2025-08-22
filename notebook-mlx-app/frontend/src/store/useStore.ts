@@ -89,3 +89,34 @@ export const useStore = create<AppState>((set) => ({
   addCustomVoice: (voice) =>
     set((state) => ({ customVoices: [...state.customVoices, voice] })),
 }))
+
+// Create optimized selectors for better performance
+export const useSourcesStore = () => useStore((state) => ({
+  sources: state.sources,
+  selectedSources: state.selectedSources,
+  addSource: state.addSource,
+  removeSource: state.removeSource,
+  toggleSourceSelection: state.toggleSourceSelection,
+  selectAllSources: state.selectAllSources,
+  deselectAllSources: state.deselectAllSources,
+}))
+
+export const useChatStore = () => useStore((state) => ({
+  messages: state.messages,
+  isLoading: state.isLoading,
+  addMessage: state.addMessage,
+  clearMessages: state.clearMessages,
+  setLoading: state.setLoading,
+}))
+
+export const useStudioStore = () => useStore((state) => ({
+  podcastTask: state.podcastTask,
+  mindmapData: state.mindmapData,
+  setPodcastTask: state.setPodcastTask,
+  setMindmapData: state.setMindmapData,
+}))
+
+export const useVoicesStore = () => useStore((state) => ({
+  customVoices: state.customVoices,
+  addCustomVoice: state.addCustomVoice,
+}))

@@ -57,6 +57,7 @@ export function ChatPanel() {
         <button
           onClick={() => setShowExport(true)}
           className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded bg-secondary hover:bg-secondary/80"
+          data-testid="chat-export-button"
         >
           <Download className="w-4 h-4" /> Export
         </button>

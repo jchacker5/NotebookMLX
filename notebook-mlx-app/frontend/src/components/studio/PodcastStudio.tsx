@@ -171,6 +171,7 @@ export function PodcastStudio({ selectedModels }: PodcastStudioProps) {
           onClick={() => generateMutation.mutate()}
           disabled={selectedSources.length === 0 || generateMutation.isPending || (podcastTask && podcastTask.status !== 'completed' && podcastTask.status !== 'failed')}
           className="w-full py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+          data-testid="generate-podcast-button"
         >
           {generateMutation.isPending || (podcastTask && podcastTask.status !== 'completed' && podcastTask.status !== 'failed') ? (
             <>

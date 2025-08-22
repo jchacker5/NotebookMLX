@@ -27,6 +27,7 @@ export function Header({ title, onBack, showBack = false, onExport }: HeaderProp
           <button
             onClick={onExport}
             className="px-3 py-1.5 text-sm rounded bg-gray-100 hover:bg-gray-200 inline-flex items-center gap-2"
+            data-testid="header-export-button"
           >
             <Download className="h-4 w-4 text-gray-700" />
             <span>Export</span>

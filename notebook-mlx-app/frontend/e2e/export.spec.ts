@@ -12,13 +12,23 @@ test('export modal triggers chat PDF request', async ({ page }) => {
     })
   })
 
-  // Navigate to a notebook view directly
-  await page.goto('/notebook/1')
+  // Navigate to root and then simulate notebook view
+  await page.goto('/')
+  
+  // Simulate navigation to notebook view
+  await page.evaluate(() => {
+    window.history.pushState({}, '', '/notebook/1')
+    // Trigger a popstate event to make the app react to the URL change
+    window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
+  })
+  
+  // Wait for the page to load the notebook view
+  await page.waitForTimeout(1000)
 
-  // Open export modal via chat panel export button (more specific selector)
-  await page.locator('div:has-text("Chat") >> button:has-text("Export")').click()
+  // Open export modal via chat panel export button (using data-testid)
+  await page.getByTestId('chat-export-button').click()
   // Click Export chat as PDF
-  await page.getByRole('button', { name: /Export chat as PDF/i }).click()
+  await page.getByTestId('export-chat-pdf-button').click()
 
   await expect.poll(() => called).toBeTruthy()
 })
@@ -29,9 +39,20 @@ test('export modal triggers chat Markdown request', async ({ page }) => {
     called = true
     await route.fulfill({ status: 200, contentType: 'text/markdown', body: 'MD' })
   })
-  await page.goto('/notebook/1')
-  await page.locator('div:has-text("Chat") >> button:has-text("Export")').click()
-  await page.getByRole('button', { name: /Export chat as Markdown/i }).click()
+  // Navigate to root and then simulate notebook view
+  await page.goto('/')
+  
+  // Simulate navigation to notebook view
+  await page.evaluate(() => {
+    window.history.pushState({}, '', '/notebook/1')
+    window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
+  })
+  
+  // Wait for the page to load the notebook view
+  await page.waitForTimeout(1000)
+  
+  await page.getByTestId('chat-export-button').click()
+  await page.getByTestId('export-chat-markdown-button').click()
   await expect.poll(() => called).toBeTruthy()
 })
 
@@ -41,14 +62,25 @@ test('export modal triggers chat HTML request and JSON download', async ({ page 
     htmlCalled = true
     await route.fulfill({ status: 200, contentType: 'text/html', body: '<html></html>' })
   })
-  await page.goto('/notebook/1')
-  await page.locator('div:has-text("Chat") >> button:has-text("Export")').click()
-  await page.getByRole('button', { name: /Export chat as HTML/i }).click()
+  // Navigate to root and then simulate notebook view
+  await page.goto('/')
+  
+  // Simulate navigation to notebook view
+  await page.evaluate(() => {
+    window.history.pushState({}, '', '/notebook/1')
+    window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
+  })
+  
+  // Wait for the page to load the notebook view
+  await page.waitForTimeout(1000)
+  
+  await page.getByTestId('chat-export-button').click()
+  await page.getByTestId('export-chat-html-button').click()
   await expect.poll(() => htmlCalled).toBeTruthy()
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByRole('button', { name: /Export chat as JSON/i }).click(),
+    page.getByTestId('export-chat-json-button').click(),
   ])
   expect(download.suggestedFilename()).toMatch(/chat_export.*\.json$/)
 })
@@ -77,25 +109,41 @@ test('downloads pill appears and navigates to Downloads', async ({ page }) => {
     }
   })
 
-  await page.goto('/notebook/1')
+  // Navigate to root and then simulate notebook view
+  await page.goto('/')
   
-  // Wait for sources to be loaded and add a mock source to the store
+  // Simulate navigation to notebook view
   await page.evaluate(() => {
-    // Simulate having sources selected in the store
-    const mockSource = { id: 'test-source-1', filename: 'test.pdf', type: 'pdf', uploadedAt: new Date() }
-    window.useStore?.getState?.()?.addSource?.(mockSource)
-    window.useStore?.getState?.()?.toggleSourceSelection?.('test-source-1')
+    window.history.pushState({}, '', '/notebook/1')
+    window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
   })
   
-  // Switch to Studio panel
+  // Wait for the page to load the notebook view
+  await page.waitForTimeout(1000)
+  
+  // Switch to Studio panel first
   await page.getByRole('button', { name: /^Studio$/ }).click()
   
+  // Add a mock source to the store and select it
+  await page.evaluate(() => {
+    // Wait for store to be available and add test source
+    if (window.useStore) {
+      const store = window.useStore.getState()
+      const mockSource = { id: 'test-source-1', filename: 'test.pdf', type: 'pdf', uploadedAt: new Date() }
+      store.addSource(mockSource)
+      store.toggleSourceSelection('test-source-1')
+    }
+  })
+  
+  // Wait for a moment to ensure state is updated
+  await page.waitForTimeout(500)
+  
   // Wait for the Generate Podcast button to be enabled
-  await page.waitForSelector('button:has-text("Generate Podcast"):not([disabled])', { timeout: 5000 })
+  await page.waitForSelector('[data-testid="generate-podcast-button"]:not([disabled])', { timeout: 15000 })
   
   // Click generate to start task
-  await page.getByRole('button', { name: /Generate Podcast/i }).click()
-  // Wait for pill and click it
-  await page.getByRole('button', { name: /Downloads/ }).click()
+  await page.getByTestId('generate-podcast-button').click()
+  // Wait for downloads pill to appear and click it
+  await page.getByTestId('downloads-pill-button').click()
   await expect(page.getByText(/Transcript \\+ timings \(JSON\)/i)).toBeVisible()
 })

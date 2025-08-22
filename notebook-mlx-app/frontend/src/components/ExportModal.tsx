@@ -96,12 +96,14 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
           <button
             onClick={handleExportChatPdf}
             className="w-full flex items-center gap-3 p-3 border rounded hover:bg-black/5"
+            data-testid="export-chat-pdf-button"
           >
             <FileText className="w-5 h-5" /> Export chat as PDF
           </button>
           <button
             onClick={handleExportChatHtml}
             className="w-full flex items-center gap-3 p-3 border rounded hover:bg-black/5"
+            data-testid="export-chat-html-button"
           >
             <FileText className="w-5 h-5" /> Export chat as HTML
           </button>
@@ -117,6 +119,7 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
               notify('Chat Markdown exported')
             }}
             className="w-full flex items-center gap-3 p-3 border rounded hover:bg-black/5"
+            data-testid="export-chat-markdown-button"
           >
             <FileText className="w-5 h-5" /> Export chat as Markdown
           </button>
@@ -137,6 +140,7 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
               notify('Chat JSON exported')
             }}
             className="w-full flex items-center gap-3 p-3 border rounded hover:bg-black/5"
+            data-testid="export-chat-json-button"
           >
             <FileText className="w-5 h-5" /> Export chat as JSON
           </button>

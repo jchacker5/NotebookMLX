@@ -69,26 +69,69 @@ class Rewriter:
         return rewritten
     
     def parse_rewritten_transcript(self, rewritten_text: str) -> List[Tuple[str, str]]:
-        """Parse the rewritten transcript back into segments"""
+        """Parse the rewritten transcript back into segments with enhanced security"""
+        import re
+        
+        # Input validation and sanitization
+        if not rewritten_text or len(rewritten_text) > 100000:  # 100KB limit
+            return []
+        
+        # Remove potentially dangerous characters
+        safe_text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x84\x86-\x9f]', '', rewritten_text)
+        
         try:
-            # Try to parse as Python literal
-            segments = ast.literal_eval(rewritten_text)
+            # SECURITY: Safe parsing without eval - only allow list of tuples
+            # Parse manually instead of using ast.literal_eval for better control
+            segments = self._safe_parse_transcript(safe_text)
             return segments
-        except:
-            # Fallback parsing if literal_eval fails
-            segments = []
-            lines = rewritten_text.split('\n')
+        except Exception as e:
+            logger.warning(f"Failed to parse rewritten transcript safely: {e}")
+            # Fallback parsing with strict validation
+            return self._fallback_parse_transcript(safe_text)
+    
+    def _safe_parse_transcript(self, text: str) -> List[Tuple[str, str]]:
+        """Safely parse transcript using regex instead of eval"""
+        import re
+        
+        segments = []
+        # Pattern to match tuple format: ('Speaker X', 'text content')
+        pattern = r"\(\s*['\"]Speaker\s+[12]['\"]\s*,\s*['\"]([^'\"]*)['\"]\s*\)"
+        
+        for match in re.finditer(pattern, text):
+            speaker_match = re.search(r"Speaker\s+([12])", match.group(0))
+            if speaker_match:
+                speaker = f"Speaker {speaker_match.group(1)}"
+                content = match.group(1).strip()
+                # Validate content length and characters
+                if len(content) <= 1000 and content:
+                    segments.append((speaker, content))
+        
+        return segments
+    
+    def _fallback_parse_transcript(self, text: str) -> List[Tuple[str, str]]:
+        """Fallback parsing with strict validation"""
+        import re
+        
+        segments = []
+        lines = text.split('\n')
+        
+        for line in lines[:1000]:  # Limit processing to 1000 lines
+            line = line.strip()
+            if len(line) > 2000:  # Skip overly long lines
+                continue
+                
+            # Safe speaker detection with strict patterns
+            speaker_pattern = r'^(Speaker\s+[12])\s*:\s*(.*)$'
+            match = re.match(speaker_pattern, line)
             
-            for line in lines:
-                line = line.strip()
-                if 'Speaker 1' in line and ':' in line:
-                    text = line.split(':', 1)[1].strip().strip('"\'')
-                    segments.append(('Speaker 1', text))
-                elif 'Speaker 2' in line and ':' in line:
-                    text = line.split(':', 1)[1].strip().strip('"\'')
-                    segments.append(('Speaker 2', text))
-            
-            return segments
+            if match:
+                speaker = match.group(1).strip()
+                text_content = match.group(2).strip().strip('"\'')
+                # Additional validation
+                if len(text_content) <= 1000 and text_content:
+                    segments.append((speaker, text_content))
+        
+        return segments
     
     def enhance_transcript(self, transcript_segments: List[Tuple[str, str]]) -> List[Tuple[str, str]]:
         """Main method to enhance a transcript"""

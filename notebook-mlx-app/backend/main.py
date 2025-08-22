@@ -178,20 +178,72 @@ for h in (fh, sh):
     if h not in logger.handlers:
         logger.addHandler(h)
 
-# Simple in-memory rate limiter (per-IP per key)
+# Enhanced rate limiter with sliding window and persistence
 _rate_buckets = defaultdict(lambda: deque())
-def check_rate_limit(request: Request, key: str, limit_per_min: int) -> None:
-    # Identify client
-    ip = request.client.host if request and request.client else 'local'
+_failed_attempts = defaultdict(int)
+_blocked_ips = set()
+
+def get_client_identifier(request: Request) -> str:
+    """Get client identifier with enhanced detection"""
+    # Check for forwarded IP headers (when behind proxy)
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        return forwarded_for.split(',')[0].strip()
+    
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    
+    return request.client.host if request and request.client else 'local'
+
+def check_rate_limit(request: Request, key: str, limit_per_min: int, 
+                    burst_limit: Optional[int] = None) -> None:
+    """Enhanced rate limiting with burst protection and IP blocking"""
+    ip = get_client_identifier(request)
+    
+    # Check if IP is blocked
+    if ip in _blocked_ips:
+        raise HTTPException(status_code=429, detail="IP temporarily blocked due to abuse")
+    
     bucket_key = f"{key}:{ip}"
     q = _rate_buckets[bucket_key]
     now = time.time()
-    # Remove entries older than 60s
+    
+    # Clean old entries (sliding window)
     while q and now - q[0] > 60:
         q.popleft()
+    
+    # Check burst limit (short-term)
+    if burst_limit:
+        recent_requests = sum(1 for t in q if now - t < 10)  # Last 10 seconds
+        if recent_requests >= burst_limit:
+            _failed_attempts[ip] += 1
+            if _failed_attempts[ip] >= 5:
+                _blocked_ips.add(ip)
+                # Schedule IP unblock after 5 minutes
+                import asyncio
+                asyncio.create_task(unblock_ip_after_delay(ip, 300))
+            raise HTTPException(status_code=429, detail="Burst limit exceeded")
+    
+    # Check rate limit
     if len(q) >= limit_per_min:
-        raise HTTPException(status_code=429, detail="Too many requests, slow down")
+        _failed_attempts[ip] += 1
+        if _failed_attempts[ip] >= 10:
+            _blocked_ips.add(ip)
+            import asyncio
+            asyncio.create_task(unblock_ip_after_delay(ip, 300))
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
+    
     q.append(now)
+    # Reset failed attempts on successful request
+    if ip in _failed_attempts:
+        _failed_attempts[ip] = max(0, _failed_attempts[ip] - 1)
+
+async def unblock_ip_after_delay(ip: str, delay_seconds: int):
+    """Unblock IP after specified delay"""
+    await asyncio.sleep(delay_seconds)
+    _blocked_ips.discard(ip)
+    _failed_attempts.pop(ip, None)
 
 # Pydantic models
 class ChatRequest(BaseModel):
@@ -459,7 +511,9 @@ async def upload_source(file: UploadFile = File(...)):
         # Save uploaded file
         source_id = str(uuid.uuid4())
         file_path = await file_manager.save_upload(file, source_id)
-        # Enforce upload size limit
+        # Enhanced upload size and rate limiting
+        check_rate_limit(request, key='upload', limit_per_min=10, burst_limit=3)
+        
         max_mb = int(os.getenv('BACKEND_MAX_UPLOAD_MB', '200'))
         size_mb = os.path.getsize(file_path) / (1024 * 1024)
         if size_mb > max_mb:
@@ -479,7 +533,7 @@ async def upload_source(file: UploadFile = File(...)):
                 hasher.update(chunk)
         file_hash = hasher.hexdigest()
 
-        # Validate extension
+        # Enhanced file validation
         allowed_exts = {'.pdf', '.txt', '.md'}
         ext = Path(file.filename).suffix.lower()
         if ext not in allowed_exts:
@@ -489,17 +543,70 @@ async def upload_source(file: UploadFile = File(...)):
                 pass
             raise HTTPException(status_code=415, detail=f"Unsupported file type: {ext}")
 
-        # Save uploaded file
+        # Enhanced file security validation
         if ext == '.pdf':
-            # Sniff header for PDF magic
-            with open(file_path, 'rb') as rf:
-                header = rf.read(5)
-            if header != b'%PDF-':
+            # Comprehensive PDF validation
+            try:
+                with open(file_path, 'rb') as rf:
+                    # Check PDF header
+                    header = rf.read(1024)  # Read more data for validation
+                    if not header.startswith(b'%PDF-'):
+                        raise ValueError("Invalid PDF header")
+                    
+                    # Basic PDF structure validation
+                    rf.seek(0)
+                    content = rf.read(10240)  # Read first 10KB
+                    
+                    # Check for suspicious patterns
+                    dangerous_patterns = [
+                        b'/JavaScript', b'/JS', b'/OpenAction',
+                        b'/AcroForm', b'/XFA', b'/RichMedia',
+                        b'/Launch', b'/SubmitForm', b'/ImportData'
+                    ]
+                    
+                    for pattern in dangerous_patterns:
+                        if pattern in content:
+                            logger.warning(f"Potentially malicious PDF pattern detected: {pattern}")
+                            # Continue processing but log for monitoring
+                    
+                    # Validate PDF can be opened without errors
+                    import PyPDF2
+                    rf.seek(0)
+                    try:
+                        pdf_reader = PyPDF2.PdfReader(rf)
+                        if len(pdf_reader.pages) == 0:
+                            raise ValueError("PDF contains no readable pages")
+                    except Exception as e:
+                        raise ValueError(f"PDF validation failed: {e}")
+                        
+            except Exception as e:
                 try:
                     os.remove(file_path)
                 except Exception:
                     pass
-                raise HTTPException(status_code=415, detail="Invalid PDF header")
+                raise HTTPException(status_code=415, detail=f"Invalid or potentially malicious PDF: {e}")
+        
+        elif ext in {'.txt', '.md'}:
+            # Text file validation
+            try:
+                with open(file_path, 'rb') as rf:
+                    # Check for binary content in text files
+                    sample = rf.read(1024)
+                    try:
+                        sample.decode('utf-8')
+                    except UnicodeDecodeError:
+                        raise ValueError("File contains binary data")
+                    
+                    # Check for suspicious patterns
+                    if b'\x00' in sample:  # Null bytes
+                        raise ValueError("File contains null bytes")
+                        
+            except Exception as e:
+                try:
+                    os.remove(file_path)
+                except Exception:
+                    pass
+                raise HTTPException(status_code=415, detail=f"Invalid text file: {e}")
             # Process PDF
             # Check cache first
             cache_path = file_manager.get_file_path("processed", file_hash + ".txt")
@@ -852,20 +959,39 @@ async def train_voice(
 
 @app.get("/api/download/{file_type}/{file_id}")
 async def download_file(file_type: str, file_id: str):
-    """Download generated files"""
+    """Download generated files with enhanced security"""
     allowed_types = {"uploads", "processed", "podcasts", "tts", "voices", "mindmaps", "videos"}
     if file_type not in allowed_types:
         raise HTTPException(status_code=400, detail="Invalid file type")
-    # prevent path traversal
-    if "/" in file_id or ".." in file_id or file_id.startswith(('.', '/')):
-        raise HTTPException(status_code=400, detail="Invalid file id")
-    # restrict characters
+    
+    # Enhanced path traversal prevention
     import re
-    if not re.match(r"^[\w\-\.@]+$", file_id):
+    import os.path
+    
+    # Strict character validation
+    if not re.match(r"^[a-zA-Z0-9_\-\.@]{1,255}$", file_id):
         raise HTTPException(status_code=400, detail="Invalid file id")
-    file_path = Path(file_manager.base_path) / file_type / file_id
-    if not file_path.exists():
+    
+    # Prevent path traversal attempts
+    if ".." in file_id or "/" in file_id or "\\" in file_id:
+        raise HTTPException(status_code=400, detail="Invalid file id")
+    
+    # Construct and validate file path
+    base_path = Path(file_manager.base_path).resolve()
+    file_path = (base_path / file_type / file_id).resolve()
+    
+    # Ensure resolved path is within allowed directory
+    if not str(file_path).startswith(str(base_path)):
+        raise HTTPException(status_code=400, detail="Access denied")
+    
+    if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
+    
+    # Additional security: check file size before serving
+    max_download_size = int(os.getenv('MAX_DOWNLOAD_SIZE_MB', '100')) * 1024 * 1024
+    if file_path.stat().st_size > max_download_size:
+        raise HTTPException(status_code=413, detail="File too large for download")
+    
     return FileResponse(str(file_path))
 
 if __name__ == "__main__":

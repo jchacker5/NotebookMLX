@@ -1,34 +1,144 @@
-repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
-    hooks:
-      - id: check-yaml
-      - id: end-of-file-fixer
-      - id: trailing-whitespace
+# Pre-commit hooks configuration for NotebookMLX
+# See https://pre-commit.com for more information
 
+repos:
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.md$'
+      - id: end-of-file-fixer
+        exclude: '\.svg$'
+      - id: check-yaml
+        args: ['--unsafe']
+      - id: check-json
+      - id: check-toml
+      - id: check-xml
+      - id: check-added-large-files
+        args: ['--maxkb=10000']
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+
+  # Python hooks for backend
   - repo: https://github.com/psf/black
-    rev: 24.8.0
+    rev: 23.12.1
     hooks:
       - id: black
+        files: ^notebook-mlx-app/backend/
         language_version: python3
-        additional_dependencies: []
 
   - repo: https://github.com/pycqa/isort
     rev: 5.13.2
     hooks:
       - id: isort
+        files: ^notebook-mlx-app/backend/
+        args: ["--profile", "black"]
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        files: ^notebook-mlx-app/backend/
+        args: ['--max-line-length=88', '--extend-ignore=E203,W503']
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        files: ^notebook-mlx-app/backend/
+        additional_dependencies: [types-all]
+        args: [--ignore-missing-imports]
+
+  # Frontend TypeScript/JavaScript hooks
+  - repo: local
+    hooks:
+      - id: eslint-frontend
+        name: ESLint (Frontend)
+        entry: bash -c 'cd notebook-mlx-app/frontend && npm run lint'
+        language: system
+        files: ^notebook-mlx-app/frontend/src/.*\.(ts|tsx)$
+        pass_filenames: false
+
+      - id: prettier-frontend
+        name: Prettier (Frontend)
+        entry: bash -c 'cd notebook-mlx-app/frontend && npm run format:check'
+        language: system
+        files: ^notebook-mlx-app/frontend/src/.*\.(ts|tsx|json|css|md)$
+        pass_filenames: false
+
+      - id: typescript-check
+        name: TypeScript Check
+        entry: bash -c 'cd notebook-mlx-app/frontend && npm run type-check'
+        language: system
+        files: ^notebook-mlx-app/frontend/src/.*\.(ts|tsx)$
+        pass_filenames: false
+
+  # Security checks
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: |
+          (?x)^(
+            .*\.lock$|
+            .*\.log$|
+            .*\.pdf$|
+            .*\.wav$|
+            .*\.mp4$|
+            .*\.pkl$|
+            .*node_modules/.*|
+            .*\.git/.*|
+            .*venv/.*|
+            .*dist/.*|
+            .*build/.*
+          )$
+
+  # Documentation checks
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.39.0
+    hooks:
+      - id: markdownlint
+        args: ['--fix']
+        exclude: |
+          (?x)^(
+            .*node_modules/.*|
+            .*\.git/.*|
+            .*CHANGELOG\.md$
+          )$
+
+  # Docker hooks
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        files: Dockerfile
+
+  # Jupyter notebook cleaning
+  - repo: https://github.com/nbQA-dev/nbQA
+    rev: 1.7.1
+    hooks:
+      - id: nbqa-black
+        files: \.ipynb$
+      - id: nbqa-isort
+        files: \.ipynb$
         args: ["--profile=black"]
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.4
-    hooks:
-      - id: ruff
-        args: ["--fix"]
+# Configuration
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit.com hooks
 
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.3.3
-    hooks:
-      - id: prettier
-        additional_dependencies: ["prettier@3.3.3"]
-        files: "^(notebook-mlx-app/(frontend|electron)/|.*\\.(js|jsx|ts|tsx|css|json|md))$"
-
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: []
+  submodules: false

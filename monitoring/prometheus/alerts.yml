@@ -1,0 +1,105 @@
+groups:
+  - name: notebookmlx.rules
+    rules:
+      # Application Health Alerts
+      - alert: NotebookMLXDown
+        expr: up{job="notebookmlx-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "NotebookMLX backend is down"
+          description: "NotebookMLX backend has been down for more than 1 minute."
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value }} errors per second."
+
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High response time"
+          description: "95th percentile response time is {{ $value }}s."
+
+      # Resource Usage Alerts
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is above 80% for more than 5 minutes."
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is above 85% for more than 5 minutes."
+
+      - alert: LowDiskSpace
+        expr: (1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100 > 90
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space"
+          description: "Disk usage is above 90% on {{ $labels.mountpoint }}."
+
+      # ML Pipeline Specific Alerts
+      - alert: LongRunningPodcastGeneration
+        expr: increase(podcast_generation_duration_seconds[1h]) > 3600
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Long running podcast generation"
+          description: "Podcast generation has been running for more than 1 hour."
+
+      - alert: HighPDFProcessingFailures
+        expr: rate(pdf_processing_failures_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High PDF processing failure rate"
+          description: "PDF processing failure rate is {{ $value }} failures per second."
+
+      - alert: TTSEngineUnavailable
+        expr: tts_engine_available == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "TTS engine unavailable"
+          description: "Text-to-speech engine is not available."
+
+      # Security Alerts
+      - alert: SuspiciousUploadActivity
+        expr: rate(upload_requests_total[5m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Suspicious upload activity"
+          description: "Upload rate is {{ $value }} uploads per second, which may indicate abuse."
+
+      - alert: RateLimitTriggered
+        expr: rate(rate_limit_exceeded_total[5m]) > 0.1
+        for: 1m
+        labels:
+          severity: info
+        annotations:
+          summary: "Rate limiting active"
+          description: "Rate limiting is being triggered frequently."
