@@ -20,15 +20,28 @@ function createWindow() {
   });
 
   // Apply a restrictive Content Security Policy
-  const csp = [
-    "default-src 'self'",
-    "script-src 'self' 'unsafe-eval'", // Vite dev may require eval; disabled in prod build
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
-    "connect-src 'self' http://localhost:8000 http://127.0.0.1:8000",
-    "font-src 'self' data:",
-    "media-src 'self' blob: data:",
-  ].join('; ')
+  const isDev = process.env.NODE_ENV === 'development'
+  const csp = (
+    isDev
+      ? [
+          "default-src 'self' http://localhost:3000",
+          "script-src 'self' 'unsafe-eval' http://localhost:3000",
+          "style-src 'self' 'unsafe-inline' http://localhost:3000",
+          "img-src 'self' data:",
+          "connect-src 'self' http://localhost:8000 http://127.0.0.1:8000 ws://localhost:3000 ws://127.0.0.1:3000",
+          "font-src 'self' data:",
+          "media-src 'self' blob: data:",
+        ]
+      : [
+          "default-src 'self'",
+          "script-src 'self'",
+          "style-src 'self' 'unsafe-inline'",
+          "img-src 'self' data:",
+          "connect-src 'self'",
+          "font-src 'self' data:",
+          "media-src 'self' blob: data:",
+        ]
+  ).join('; ')
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const responseHeaders = {
@@ -52,11 +65,10 @@ function createWindow() {
 
 function startPythonBackend() {
   return new Promise((resolve, reject) => {
-    const isDev = process.env.NODE_ENV === 'development';
     let pythonCmd, pythonArgs, cwd;
 
     if (isDev) {
-      pythonCmd = 'python';
+      pythonCmd = 'python3';
       pythonArgs = [path.join(__dirname, '..', 'backend', 'main.py')];
       cwd = path.join(__dirname, '..', 'backend');
     } else {

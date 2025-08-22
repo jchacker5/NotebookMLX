@@ -8,7 +8,7 @@ from typing import List, Optional
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Request
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -90,10 +90,14 @@ REQ_LATENCY = Histogram("http_request_duration_seconds", "Request latency", ["me
 async def add_observability(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
     start = time.time()
+    status = 500
     try:
         response = await call_next(request)
         status = response.status_code
         return response
+    except Exception:
+        status = 500
+        raise
     finally:
         duration = time.time() - start
         REQ_COUNT.labels(request.method, request.url.path, str(status)).inc()
@@ -164,7 +168,7 @@ async def healthz():
 
 @app.get("/metrics")
 async def metrics():
-    return FileResponse(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 @app.post("/api/upload-source")
 async def upload_source(file: UploadFile = File(...)):
@@ -173,13 +177,16 @@ async def upload_source(file: UploadFile = File(...)):
         # Save uploaded file
         source_id = str(uuid.uuid4())
         file_path = await file_manager.save_upload(file, source_id)
-        
-        # Compute file hash for caching
+
+        # Compute file hash for caching from saved file
         hasher = hashlib.sha256()
-        content = await file.read()
-        hasher.update(content)
+        with open(file_path, 'rb') as rf:
+            while True:
+                chunk = rf.read(1024 * 1024)
+                if not chunk:
+                    break
+                hasher.update(chunk)
         file_hash = hasher.hexdigest()
-        await file.seek(0)
 
         # Save uploaded file
         if file.filename.endswith('.pdf'):
@@ -229,10 +236,10 @@ async def upload_source(file: UploadFile = File(...)):
 
 @app.post("/api/upload-chunk")
 async def upload_chunk(
-    file_id: str = File(...),
-    chunk_index: int = File(...),
-    total_chunks: int = File(...),
-    filename: str = File(...),
+    file_id: str = Form(...),
+    chunk_index: int = Form(...),
+    total_chunks: int = Form(...),
+    filename: str = Form(...),
     chunk: UploadFile = File(...),
 ):
     try:
@@ -243,13 +250,49 @@ async def upload_chunk(
 
 
 @app.post("/api/merge-chunks")
-async def merge_chunks(file_id: str = File(...), filename: str = File(...)):
+async def merge_chunks(file_id: str = Form(...), filename: str = Form(...)):
     try:
         merged_path = file_manager.merge_chunks(file_id, filename)
-        # After merge, process like a normal upload
-        dummy_upload = UploadFile(filename=filename, file=open(merged_path, 'rb'))
-        result = await upload_source(dummy_upload)
-        return result
+        # Process merged file similar to upload_source without reusing UploadFile
+        source_id = str(uuid.uuid4())
+        # Compute hash
+        hasher = hashlib.sha256()
+        with open(merged_path, 'rb') as rf:
+            while True:
+                chunk = rf.read(1024 * 1024)
+                if not chunk:
+                    break
+                hasher.update(chunk)
+        file_hash = hasher.hexdigest()
+        if filename.endswith('.pdf'):
+            cache_path = file_manager.get_file_path("processed", file_hash + ".txt")
+            if os.path.exists(cache_path):
+                with open(cache_path, 'r', encoding='utf-8') as cf:
+                    processed_text = cf.read()
+            else:
+                processed_text = pdf_processor.process_pdf(merged_path)
+                with open(cache_path, 'w', encoding='utf-8') as cf:
+                    cf.write(processed_text)
+            db.add_source({
+                "id": source_id,
+                "filename": filename,
+                "type": "pdf",
+                "path": merged_path,
+                "processed_text": processed_text,
+                "created_at": datetime.now()
+            })
+        else:
+            with open(merged_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            db.add_source({
+                "id": source_id,
+                "filename": filename,
+                "type": "text",
+                "path": merged_path,
+                "processed_text": content,
+                "created_at": datetime.now()
+            })
+        return {"source_id": source_id, "filename": filename, "status": "processed"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -257,6 +300,8 @@ async def merge_chunks(file_id: str = File(...), filename: str = File(...)):
 async def chat_with_sources(request: ChatRequest):
     """Chat with uploaded sources"""
     try:
+        if not request.source_ids:
+            raise HTTPException(status_code=400, detail="source_ids cannot be empty")
         # Get source texts
         sources = db.get_sources(request.source_ids)
         if not sources:
@@ -274,10 +319,7 @@ async def chat_with_sources(request: ChatRequest):
         )
         
         # Extract citations (simplified - in production, implement proper citation extraction)
-        citations = [
-            {"source_id": s["id"], "filename": s["filename"], "relevance": 0.8}
-            for s in sources[:2]
-        ]
+        citations = [{"sourceId": s["id"], "filename": s["filename"], "relevance": 0.8} for s in sources[:2]]
         
         return ChatResponse(response=response_text, citations=citations)
         
@@ -288,6 +330,8 @@ async def chat_with_sources(request: ChatRequest):
 async def generate_podcast(request: PodcastRequest, background_tasks: BackgroundTasks):
     """Generate a podcast from sources"""
     try:
+        if not request.source_ids:
+            raise HTTPException(status_code=400, detail="source_ids cannot be empty")
         # Get source texts
         sources = db.get_sources(request.source_ids)
         if not sources:
@@ -377,6 +421,8 @@ async def get_task_status(task_id: str):
 async def generate_mindmap(request: MindMapRequest):
     """Generate a mind map from sources"""
     try:
+        if not request.source_ids:
+            raise HTTPException(status_code=400, detail="source_ids cannot be empty")
         # Get source texts
         sources = db.get_sources(request.source_ids)
         if not sources:
@@ -414,6 +460,8 @@ async def generate_mindmap(request: MindMapRequest):
 async def synthesize_voice(request: VoiceSynthRequest):
     """Synthesize speech from text"""
     try:
+        if tts_engine is None:
+            raise HTTPException(status_code=503, detail="TTS engine not available")
         # Generate audio
         audio_path = f"data/tts/{uuid.uuid4()}.wav"
         audio = tts_engine.generate_segment_audio(
@@ -438,6 +486,8 @@ async def train_voice(
 ):
     """Train a custom voice model"""
     try:
+        if tts_engine is None:
+            return TrainVoiceResponse(status="error", voice_id=voice_name, message="TTS engine not available")
         # Save audio files
         audio_paths = []
         for audio_file in audio_files:

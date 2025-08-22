@@ -5,6 +5,7 @@ Converts PDFs to clean text using Qwen2.5-1.5B model
 import os
 from typing import Optional, List
 import PyPDF2
+from PyPDF2.errors import PdfReadError
 from mlx_lm import load, generate
 from tqdm import tqdm
 
@@ -69,8 +70,7 @@ class PDFProcessor:
                 
                 for page_num in range(num_pages):
                     page = pdf_reader.pages[page_num]
-                    text = page.extract_text()
-                    
+                    text = page.extract_text() or ""
                     if total_chars + len(text) > max_chars:
                         remaining_chars = max_chars - total_chars
                         extracted_text.append(text[:remaining_chars])
@@ -81,7 +81,7 @@ class PDFProcessor:
                 
                 return '\n'.join(extracted_text)
                 
-        except PyPDF2.PdfReadError:
+        except PdfReadError:
             raise ValueError("Invalid or corrupted PDF file")
     
     def create_word_bounded_chunks(self, text: str, target_chunk_size: int = 1000) -> List[str]:
