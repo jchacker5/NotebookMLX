@@ -150,54 +150,54 @@ def test_export_chat_pdf_and_podcast_zip():
             ],
         },
     })
-  z = client.get(f'/api/export/podcast/{task_id}.zip')
+    z = client.get(f'/api/export/podcast/{task_id}.zip')
     assert z.status_code == 200
-  assert 'application/zip' in z.headers.get('content-type', '')
+    assert 'application/zip' in z.headers.get('content-type', '')
     # Inspect contents
     import zipfile, io as _io
     buf = _io.BytesIO(z.content)
-  with zipfile.ZipFile(buf) as zf:
-      names = set(zf.namelist())
-      assert 'metadata.json' in names
-      assert 'transcript.json' in names
-      assert 'segments.json' in names
-      assert 'model_metadata.json' in names
-  # segments.json direct endpoint
-  js = client.get(f'/api/export/podcast/{task_id}/segments.json')
-  assert js.status_code == 200
-  assert js.json().get('transcript')
+    with zipfile.ZipFile(buf) as zf:
+        names = set(zf.namelist())
+        assert 'metadata.json' in names
+        assert 'transcript.json' in names
+        assert 'segments.json' in names
+        assert 'model_metadata.json' in names
+    # segments.json direct endpoint
+    js = client.get(f'/api/export/podcast/{task_id}/segments.json')
+    assert js.status_code == 200
+    assert js.json().get('transcript')
 
 
 def test_export_chat_html_and_md():
-  os.environ.setdefault('DISABLE_ML_IMPORTS', '1')
-  from main import app
-  client = TestClient(app)
-  payload = {
-    'title': 'Hello',
-    'messages': [
-      {'role': 'user', 'content': 'Hi'},
-      {'role': 'assistant', 'content': 'Yo'},
-    ]
-  }
-  h = client.post('/api/export/chat-html', json=payload)
-  assert h.status_code == 200
-  assert 'text/html' in h.headers.get('content-type', '')
-  m = client.post('/api/export/chat-md', json=payload)
-  assert m.status_code == 200
-  assert 'text/markdown' in m.headers.get('content-type', '')
+    os.environ.setdefault('DISABLE_ML_IMPORTS', '1')
+    from main import app
+    client = TestClient(app)
+    payload = {
+        'title': 'Hello',
+        'messages': [
+            {'role': 'user', 'content': 'Hi'},
+            {'role': 'assistant', 'content': 'Yo'},
+        ]
+    }
+    h = client.post('/api/export/chat-html', json=payload)
+    assert h.status_code == 200
+    assert 'text/html' in h.headers.get('content-type', '')
+    m = client.post('/api/export/chat-md', json=payload)
+    assert m.status_code == 200
+    assert 'text/markdown' in m.headers.get('content-type', '')
 
 
 def test_rate_limit_exports_returns_429():
-  os.environ['EXPORT_RATE_LIMIT_PER_MIN'] = '1'
-  from main import app, _rate_buckets
-  # Clear existing buckets to avoid test interactions
-  _rate_buckets.clear()
-  client = TestClient(app)
-  payload = {
-    'title': 'Hello',
-    'messages': [{'role': 'user', 'content': 'Hi'}]
-  }
-  r1 = client.post('/api/export/chat-md', json=payload)
-  assert r1.status_code == 200
-  r2 = client.post('/api/export/chat-md', json=payload)
-  assert r2.status_code == 429
+    os.environ['EXPORT_RATE_LIMIT_PER_MIN'] = '1'
+    from main import app, _rate_buckets
+    # Clear existing buckets to avoid test interactions
+    _rate_buckets.clear()
+    client = TestClient(app)
+    payload = {
+        'title': 'Hello',
+        'messages': [{'role': 'user', 'content': 'Hi'}]
+    }
+    r1 = client.post('/api/export/chat-md', json=payload)
+    assert r1.status_code == 200
+    r2 = client.post('/api/export/chat-md', json=payload)
+    assert r2.status_code == 429

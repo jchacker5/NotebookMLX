@@ -104,14 +104,13 @@ export function NewSourceModal({ onClose, onSuccess }: NewSourceModalProps) {
       if (selectedType === 'file') {
         for (const file of formData.files) {
           const CHUNK_THRESHOLD = 8 * 1024 * 1024
-          let res
           if (file.size >= CHUNK_THRESHOLD) {
             notify(`Uploading ${file.name} (large) …`)
-            res = await uploadSourceChunked(file, {
+            await uploadSourceChunked(file, {
               onProgress: (p) => p === 100 && notify(`Processing ${file.name} …`),
             })
           } else {
-            res = await uploadSource(file)
+            await uploadSource(file)
           }
           notify(`${file.name} uploaded`)
         }
