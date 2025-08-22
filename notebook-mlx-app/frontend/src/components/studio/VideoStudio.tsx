@@ -2,7 +2,16 @@ import React, { useState, useRef } from 'react'
 import { Video, Download, Loader2 } from 'lucide-react'
 import { useStore } from '../../store/useStore'
 
-export function VideoStudio() {
+interface VideoStudioProps {
+  selectedModels: {
+    transcript: string
+    rewriter: string
+    tts: string
+    pdf_processor: string
+  }
+}
+
+export function VideoStudio({ selectedModels }: VideoStudioProps) {
   const [videoSettings, setVideoSettings] = useState({
     style: 'waveform',
     showCaptions: true,

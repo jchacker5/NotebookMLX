@@ -5,7 +5,16 @@ import { generatePodcast, getTaskStatus } from '../../services/api'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import WaveSurfer from 'wavesurfer.js'
 
-export function PodcastStudio() {
+interface PodcastStudioProps {
+  selectedModels: {
+    transcript: string
+    rewriter: string
+    tts: string
+    pdf_processor: string
+  }
+}
+
+export function PodcastStudio({ selectedModels }: PodcastStudioProps) {
   const [voiceSettings, setVoiceSettings] = useState({
     speaker1: 'speaker1_female',
     speaker2: 'speaker2_male',
@@ -90,14 +99,27 @@ export function PodcastStudio() {
   }
 
   return (
-    <div className="flex flex-col h-full max-w-4xl mx-auto">
-      <div className="flex-1 space-y-6">
-        <div>
-          <h3 className="text-xl font-semibold mb-4">Generate Podcast</h3>
-          <p className="text-muted-foreground mb-6">
-            Transform your sources into an engaging conversational podcast
-          </p>
-        </div>
+    <div className="flex flex-col h-full">
+      <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div>
+            <h3 className="text-xl font-semibold mb-2">Audio Overview</h3>
+            <p className="text-gray-600 mb-4">
+              Transform your sources into an engaging conversational podcast using local models
+            </p>
+            
+            {/* Model Info */}
+            <div className="flex items-center space-x-4 text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
+              <div className="flex items-center space-x-1">
+                <span className="font-medium">Transcript:</span>
+                <span className="font-mono text-xs">{selectedModels.transcript.split('/').pop()}</span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <span className="font-medium">TTS:</span>
+                <span className="font-mono text-xs">{selectedModels.tts.split('/').pop()}</span>
+              </div>
+            </div>
+          </div>
 
         {/* Voice Settings */}
         <div className="grid grid-cols-2 gap-4">
@@ -193,6 +215,7 @@ export function PodcastStudio() {
             <p className="text-sm">{podcastTask.error || 'Podcast generation failed'}</p>
           </div>
         )}
+        </div>
       </div>
     </div>
   )

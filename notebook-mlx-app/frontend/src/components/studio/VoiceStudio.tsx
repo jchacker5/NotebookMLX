@@ -5,7 +5,11 @@ import { trainVoice, synthesizeVoice } from '../../services/api'
 import { useMutation } from '@tanstack/react-query'
 import { useDropzone } from 'react-dropzone'
 
-export function VoiceStudio() {
+interface VoiceStudioProps {
+  selectedModel: string
+}
+
+export function VoiceStudio({ selectedModel }: VoiceStudioProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [voiceName, setVoiceName] = useState('')
   const [testText, setTestText] = useState('Hello! This is a test of my custom voice.')

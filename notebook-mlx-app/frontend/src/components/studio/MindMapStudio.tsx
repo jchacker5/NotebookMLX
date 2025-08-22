@@ -10,7 +10,11 @@ interface MindMapNode {
   children?: MindMapNode[]
 }
 
-export function MindMapStudio() {
+interface MindMapStudioProps {
+  selectedModel: string
+}
+
+export function MindMapStudio({ selectedModel }: MindMapStudioProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const { selectedSources, mindmapData, setMindmapData } = useStore()
 
@@ -108,13 +112,23 @@ export function MindMapStudio() {
   }
 
   return (
-    <div className="flex flex-col h-full max-w-6xl mx-auto">
-      <div className="mb-6">
-        <h3 className="text-xl font-semibold mb-4">Generate Mind Map</h3>
-        <p className="text-muted-foreground">
-          Visualize key concepts and relationships from your sources
-        </p>
-      </div>
+    <div className="flex flex-col h-full">
+      <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+        <div className="max-w-6xl mx-auto space-y-6">
+          <div>
+            <h3 className="text-xl font-semibold mb-2">Study Guide</h3>
+            <p className="text-gray-600 mb-4">
+              Visualize key concepts and relationships from your sources using local models
+            </p>
+            
+            {/* Model Info */}
+            <div className="flex items-center space-x-4 text-sm text-gray-600 bg-green-50 p-3 rounded-lg">
+              <div className="flex items-center space-x-1">
+                <span className="font-medium">Model:</span>
+                <span className="font-mono text-xs">{selectedModel.split('/').pop()}</span>
+              </div>
+            </div>
+          </div>
 
       <div className="flex gap-4 mb-6">
         <button
@@ -163,6 +177,8 @@ export function MindMapStudio() {
             )}
           </div>
         )}
+        </div>
+        </div>
       </div>
     </div>
   )
