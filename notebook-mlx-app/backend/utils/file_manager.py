@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional
 import aiofiles
 from fastapi import UploadFile
+import json
 
 class FileManager:
     def __init__(self, base_path: str = "data"):
@@ -56,6 +57,28 @@ class FileManager:
         async with aiofiles.open(chunk_path, 'wb') as f:
             content = await chunk.read()
             await f.write(content)
+        # Update manifest
+        manifest_path = chunks_dir / 'manifest.json'
+        manifest = {"total_chunks": None, "filename": None, "received": [], "total_size": 0}
+        if manifest_path.exists():
+            try:
+                manifest = json.loads(manifest_path.read_text())
+            except Exception:
+                pass
+        if chunk_path.name not in manifest["received"]:
+            manifest["received"].append(chunk_path.name)
+        # recompute total size
+        total = 0
+        for p in chunks_dir.glob('*.part'):
+            try:
+                total += p.stat().st_size
+            except Exception:
+                pass
+        manifest["total_size"] = total
+        try:
+            manifest_path.write_text(json.dumps(manifest))
+        except Exception:
+            pass
         return str(chunk_path)
 
     def merge_chunks(self, file_id: str, filename: str) -> str:

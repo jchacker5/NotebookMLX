@@ -7,7 +7,7 @@
 我用 [MLX](https://github.com/ml-explore/mlx)
 移植了 [NotebookLlama](https://github.com/meta-llama/llama-recipes/tree/main/recipes/quickstart/NotebookLlama) 🔥
 
-其使用了 [mlx-community/Qwen2.5-3B-Instruct-4bit](https://huggingface.co/mlx-community/Qwen2.5-3B-Instruct-4bit) 对
+其使用了 [mlx-community/Qwen2.5-1.5B-Instruct-4bit](https://huggingface.co/mlx-community/Qwen2.5-1.5B-Instruct-4bit) 对
 PDF
 进行预处理, [mlx-community/Qwen2.5-14B-Instruct-4bit](https://huggingface.co/mlx-community/Qwen2.5-14B-Instruct-4bit)
 撰写讲稿, [mlx-community/Qwen2.5-7B-Instruct-4bit](https://huggingface.co/mlx-community/Qwen2.5-7B-Instruct-4bit) 润色讲稿,
@@ -18,7 +18,7 @@ PDF
 
 
 [步骤 1](Step-1-PDF预处理.ipynb): 预处理
-PDF：使用 [mlx-community/Qwen2.5-1.5B-Instruct-bf16](https://huggingface.co/mlx-community/Qwen2.5-1.5B-Instruct-4bit)
+PDF：使用 [mlx-community/Qwen2.5-1.5B-Instruct-4bit](https://huggingface.co/mlx-community/Qwen2.5-1.5B-Instruct-4bit)
 预处理PDF并将其保存为`.txt`文件。
 
 [步骤 2](Step-2-撰写讲稿.ipynb):

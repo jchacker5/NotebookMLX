@@ -36,5 +36,5 @@ Contract
 - `source_ids` must be non-empty for chat/generation endpoints.
 
 Run
-- `pip install -r requirements.txt && python3 main.py`
+- `pip install -r requirements.txt && uvicorn main:app --reload`
 - Docker: `docker compose up --build` (ML disabled by default).

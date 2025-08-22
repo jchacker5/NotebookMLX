@@ -8,7 +8,7 @@ Install and Run (Dev)
 1) Frontend
    - `cd notebook-mlx-app/frontend && pnpm install && pnpm start` (Vite on 3000)
 2) Backend
-   - `cd notebook-mlx-app/backend && pip install -r requirements.txt && python3 main.py` (API on 8000)
+   - `cd notebook-mlx-app/backend && pip install -r requirements.txt && uvicorn main:app --reload` (API on 8000)
 3) Electron (optional)
    - `cd notebook-mlx-app && pnpm start` (spawns backend+frontend+Electron)
 

@@ -81,7 +81,7 @@ app.add_middleware(
 # Structured logging
 logger = logging.getLogger("notebookmlx")
 logger.setLevel(logging.INFO)
-log_dir = Path('data')
+log_dir = Path(data_dir)
 log_dir.mkdir(parents=True, exist_ok=True)
 fh = RotatingFileHandler(log_dir / 'app.log', maxBytes=2_000_000, backupCount=3)
 sh = logging.StreamHandler()
@@ -488,6 +488,15 @@ async def upload_source(file: UploadFile = File(...)):
 
         # Save uploaded file
         if ext == '.pdf':
+            # Sniff header for PDF magic
+            with open(file_path, 'rb') as rf:
+                header = rf.read(5)
+            if header != b'%PDF-':
+                try:
+                    os.remove(file_path)
+                except Exception:
+                    pass
+                raise HTTPException(status_code=415, detail="Invalid PDF header")
             # Process PDF
             # Check cache first
             cache_path = file_manager.get_file_path("processed", file_hash + ".txt")
@@ -588,6 +597,15 @@ async def merge_chunks(file_id: str = Form(...), filename: str = Form(...)):
                 pass
             raise HTTPException(status_code=415, detail=f"Unsupported file type: {ext}")
         if ext == '.pdf':
+            # Sniff header for PDF magic
+            with open(merged_path, 'rb') as rf:
+                header = rf.read(5)
+            if header != b'%PDF-':
+                try:
+                    os.remove(merged_path)
+                except Exception:
+                    pass
+                raise HTTPException(status_code=415, detail="Invalid PDF header")
             cache_path = file_manager.get_file_path("processed", file_hash + ".txt")
             if os.path.exists(cache_path):
                 with open(cache_path, 'r', encoding='utf-8') as cf:

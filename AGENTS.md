@@ -30,11 +30,12 @@
   - Keep UI code in `frontend/src/**`; avoid business logic in components. Type with TS.
 
 ## Testing Guidelines
-- No formal test suite is present yet.
-- Recommended patterns when adding tests:
-  - Backend: `pytest` with files as `tests/test_*.py`; spin up app via `from backend.main import app` and use FastAPI `TestClient`.
+- Backend tests exist under `notebook-mlx-app/backend/tests/` with coverage ≥80% enforced via `pytest.ini`.
+- Frontend E2E is powered by Playwright in `notebook-mlx-app/frontend/e2e/` with an HTML report in CI.
+- Recommended unit test patterns when adding more:
+  - Backend: `pytest` with files as `tests/test_*.py`; import `app` from `backend.main` and use FastAPI `TestClient`.
   - Frontend: Vitest + React Testing Library with files `src/**/*.test.tsx`.
-  - Keep sample fixtures under `tests/fixtures/` and mock model calls.
+  - Keep sample fixtures under `tests/fixtures/` and mock expensive model calls.
 
 ## Tooling & CI
 - Pre-commit: configured with Black, Isort, Ruff, and Prettier (`.pre-commit-config.yaml`).
