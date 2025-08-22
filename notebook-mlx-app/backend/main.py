@@ -245,6 +245,55 @@ async def export_podcast_zip(task_id: str):
             audio_path = data.get('audio_path') or task.get('audio_path')
             if audio_path and os.path.exists(audio_path):
                 zf.write(audio_path, arcname=os.path.join('audio', os.path.basename(audio_path)))
+
+            # Add segments with placeholder timestamps if transcript available
+            if transcript and isinstance(transcript, list):
+                segs = []
+                for idx, seg in enumerate(transcript):
+                    if isinstance(seg, (list, tuple)) and len(seg) == 2:
+                        speaker, text = seg
+                    elif isinstance(seg, dict):
+                        speaker, text = seg.get('speaker', ''), seg.get('text', '')
+                    else:
+                        speaker, text = '', str(seg)
+                    segs.append({
+                        "index": idx,
+                        "speaker": speaker,
+                        "text": text,
+                        "timestamp": None,
+                    })
+                zf.writestr('segments.json', json.dumps(segs, indent=2))
+
+            # Add model metadata when available
+            model_meta = {}
+            try:
+                from ml.pdf_processor import DEFAULT_MODEL as PDF_PREPROCESS_MODEL
+            except Exception:
+                PDF_PREPROCESS_MODEL = None
+            try:
+                from ml.transcript_generator import DEFAULT_MODEL as TRANSCRIPT_MODEL
+            except Exception:
+                TRANSCRIPT_MODEL = None
+            try:
+                from ml.rewriter import DEFAULT_MODEL as REWRITER_MODEL
+            except Exception:
+                REWRITER_MODEL = None
+            model_meta["pdf_preprocess_model"] = PDF_PREPROCESS_MODEL or getattr(pdf_processor, 'model_name', None)
+            model_meta["transcript_model"] = TRANSCRIPT_MODEL or getattr(transcript_generator, 'model_name', None)
+            model_meta["rewriter_model"] = REWRITER_MODEL or getattr(rewriter, 'model_name', None)
+            model_meta["tts_model"] = getattr(tts_engine, 'model_name', None) if tts_engine is not None else None
+            zf.writestr('model_metadata.json', json.dumps(model_meta, indent=2))
+
+            # Optional: include a cover asset if present
+            try:
+                # Try app assets path
+                backend_dir = Path(__file__).resolve().parent
+                project_root = backend_dir.parent
+                cover_svg = project_root / 'assets' / 'icon.svg'
+                if cover_svg.exists():
+                    zf.write(str(cover_svg), arcname='cover/icon.svg')
+            except Exception:
+                pass
         filename = f"podcast_{task_id}.zip"
         return FileResponse(tmp_zip, filename=filename, media_type="application/zip")
     except Exception as e:
