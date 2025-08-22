@@ -145,26 +145,105 @@ class TTSEngine:
     
     def train_voice(self, audio_files: List[str], voice_name: str, 
                    transcripts: Optional[List[str]] = None) -> Dict:
-        """Train a custom voice model from multiple audio files"""
+        """Train a custom voice model from multiple audio files using F5-TTS"""
         if not audio_files:
             return {
                 "status": "error",
                 "message": "No audio files provided"
             }
         
-        # For now, use the first audio file as reference
-        # Future: Implement proper voice training with multiple samples
-        reference_text = "This is my custom voice."
-        if transcripts and len(transcripts) > 0:
-            reference_text = transcripts[0]
-            
-        self.add_custom_voice(voice_name, audio_files[0], reference_text)
+        if len(audio_files) < 3:
+            return {
+                "status": "error", 
+                "message": "At least 3 audio samples required for voice training"
+            }
         
-        return {
-            "status": "success",
-            "voice_id": voice_name,
-            "message": f"Voice profile created using {len(audio_files)} reference audio files"
-        }
+        try:
+            # Step 1: Process and validate audio files
+            processed_samples = []
+            for i, audio_file in enumerate(audio_files):
+                if not os.path.exists(audio_file):
+                    continue
+                    
+                # Load and validate audio
+                audio_data, sample_rate = sf.read(audio_file)
+                
+                # Ensure proper format (mono, 24kHz)
+                if len(audio_data.shape) > 1:
+                    audio_data = np.mean(audio_data, axis=1)
+                
+                # Resample if needed
+                if sample_rate != self.sample_rate:
+                    # Simple resampling (in production, use proper resampling)
+                    audio_data = audio_data[::int(sample_rate / self.sample_rate)]
+                
+                processed_samples.append({
+                    "audio": audio_data,
+                    "transcript": transcripts[i] if transcripts and i < len(transcripts) else "",
+                    "duration": len(audio_data) / self.sample_rate
+                })
+            
+            if len(processed_samples) < 3:
+                return {
+                    "status": "error",
+                    "message": "Not enough valid audio samples for training"
+                }
+            
+            # Step 2: Create voice profile directory
+            voice_dir = f"data/voices/{voice_name.replace(' ', '_').lower()}"
+            os.makedirs(voice_dir, exist_ok=True)
+            
+            # Step 3: Save processed samples
+            reference_audio_path = os.path.join(voice_dir, "reference.wav")
+            reference_text = ""
+            
+            # Combine all samples into one reference file for F5-TTS
+            combined_audio = np.concatenate([sample["audio"] for sample in processed_samples])
+            combined_text = " ".join([sample["transcript"] for sample in processed_samples if sample["transcript"]])
+            
+            # Save reference audio
+            sf.write(reference_audio_path, combined_audio, self.sample_rate)
+            
+            # Save metadata
+            voice_metadata = {
+                "name": voice_name,
+                "created_at": str(np.datetime64('now')),
+                "sample_count": len(processed_samples),
+                "total_duration": sum(s["duration"] for s in processed_samples),
+                "reference_audio": reference_audio_path,
+                "reference_text": combined_text or "This is my custom trained voice.",
+                "model_type": "f5-tts",
+                "training_samples": [
+                    {
+                        "transcript": sample["transcript"],
+                        "duration": sample["duration"]
+                    } for sample in processed_samples
+                ]
+            }
+            
+            metadata_path = os.path.join(voice_dir, "metadata.json")
+            with open(metadata_path, 'w') as f:
+                import json
+                json.dump(voice_metadata, f, indent=2)
+            
+            # Step 4: Add to custom voices
+            self.add_custom_voice(voice_name, reference_audio_path, combined_text or "This is my custom trained voice.")
+            
+            return {
+                "status": "success",
+                "voice_id": voice_name,
+                "voice_dir": voice_dir,
+                "reference_audio": reference_audio_path,
+                "sample_count": len(processed_samples),
+                "total_duration": sum(s["duration"] for s in processed_samples),
+                "message": f"Voice '{voice_name}' successfully trained with {len(processed_samples)} samples"
+            }
+            
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Voice training failed: {str(e)}"
+            }
     
     def export_with_effects(self, input_path: str, output_path: str, 
                            fade_in: int = 1000, fade_out: int = 2000,
