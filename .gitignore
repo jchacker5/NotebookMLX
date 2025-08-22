@@ -87,6 +87,8 @@ notebook-mlx-app/backend/data/
 notebook-mlx-app/frontend/dist/
 notebook-mlx-app/frontend/node_modules/
 node_modules/
+notebook-mlx-app/frontend/playwright-report/
+notebook-mlx-app/frontend/test-results/
 notebook-mlx-app/notebook-mlx-app.app/
 
 # pyenv
