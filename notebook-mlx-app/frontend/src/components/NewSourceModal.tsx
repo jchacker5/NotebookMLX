@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react'
 import { X, Upload, Link, Mic, FileText, Youtube, Globe, Loader2 } from 'lucide-react'
+import { uploadSource, uploadSourceChunked } from '../services/api'
+import { useToast } from './Toast'
 
 interface NewSourceModalProps {
   onClose: () => void
@@ -50,6 +52,7 @@ export function NewSourceModal({ onClose, onSuccess }: NewSourceModalProps) {
   }
 
   const [error, setError] = useState<string>('')
+  const { notify } = useToast()
 
   const handleSubmit = async () => {
     setIsUploading(true)
@@ -76,11 +79,11 @@ export function NewSourceModal({ onClose, onSuccess }: NewSourceModalProps) {
       // Validate file types and sizes
       if (selectedType === 'file') {
         for (const file of formData.files) {
-          if (file.size > 50 * 1024 * 1024) { // 50MB limit
-            throw new Error(`File ${file.name} is too large (max 50MB)`)
+          if (file.size > 200 * 1024 * 1024) { // 200MB limit to match backend
+            throw new Error(`File ${file.name} is too large (max 200MB)`)
           }
           
-          const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.ppt', '.pptx']
+          const allowedTypes = ['.pdf', '.txt', '.md']
           const fileExt = '.' + file.name.split('.').pop()?.toLowerCase()
           if (!allowedTypes.includes(fileExt)) {
             throw new Error(`File ${file.name} has an unsupported format`)
@@ -97,8 +100,22 @@ export function NewSourceModal({ onClose, onSuccess }: NewSourceModalProps) {
         }
       }
 
-      // TODO: Implement actual upload logic with API calls
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Upload files
+      if (selectedType === 'file') {
+        for (const file of formData.files) {
+          const CHUNK_THRESHOLD = 8 * 1024 * 1024
+          let res
+          if (file.size >= CHUNK_THRESHOLD) {
+            notify(`Uploading ${file.name} (large) …`)
+            res = await uploadSourceChunked(file, {
+              onProgress: (p) => p === 100 && notify(`Processing ${file.name} …`),
+            })
+          } else {
+            res = await uploadSource(file)
+          }
+          notify(`${file.name} uploaded`)
+        }
+      }
       
       onSuccess()
     } catch (error) {
@@ -188,13 +205,13 @@ export function NewSourceModal({ onClose, onSuccess }: NewSourceModalProps) {
                   </button>
                 </p>
                 <p className="text-xs text-gray-500">
-                  Supported: PDF, DOC, DOCX, TXT, PPT, PPTX (max 50MB each)
+                  Supported: PDF, TXT, MD (max 200MB each)
                 </p>
                 <input
                   ref={fileInputRef}
                   type="file"
                   multiple
-                  accept=".pdf,.doc,.docx,.txt,.ppt,.pptx"
+                  accept=".pdf,.txt,.md"
                   onChange={handleFileChange}
                   className="hidden"
                 />
