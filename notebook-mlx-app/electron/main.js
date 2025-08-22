@@ -14,7 +14,8 @@ function createWindow() {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js')
     },
-    titleBarStyle: 'hiddenInset',
+    titleBarStyle: 'hidden',
+    trafficLightPosition: { x: 15, y: 15 },
     backgroundColor: '#1a1a1a'
   });
 
@@ -31,64 +32,98 @@ function createWindow() {
 }
 
 function startPythonBackend() {
-  const isDev = process.env.NODE_ENV === 'development';
-  let pythonCmd, pythonArgs, cwd;
-  
-  if (isDev) {
-    // Development mode - use local Python
-    pythonCmd = 'python';
-    pythonArgs = [path.join(__dirname, '..', 'backend', 'main.py')];
-    cwd = path.join(__dirname, '..', 'backend');
-  } else {
-    // Production mode - use bundled Python
-    const resourcesPath = process.resourcesPath || path.join(__dirname, '..');
-    const pythonDistPath = path.join(resourcesPath, 'python-dist');
-    
-    if (process.platform === 'darwin') {
-      // macOS
-      pythonCmd = path.join(pythonDistPath, 'start-backend.sh');
-      pythonArgs = [];
-      cwd = pythonDistPath;
+  return new Promise((resolve, reject) => {
+    const isDev = process.env.NODE_ENV === 'development';
+    let pythonCmd, pythonArgs, cwd;
+
+    if (isDev) {
+      pythonCmd = 'python';
+      pythonArgs = [path.join(__dirname, '..', 'backend', 'main.py')];
+      cwd = path.join(__dirname, '..', 'backend');
     } else {
-      // Windows/Linux
-      pythonCmd = path.join(pythonDistPath, 'venv', 'bin', 'python');
-      pythonArgs = [path.join(pythonDistPath, 'launch.py')];
-      cwd = pythonDistPath;
+      const resourcesPath = process.resourcesPath;
+      const pythonDistPath = path.join(resourcesPath, 'python-dist');
+      
+      if (process.platform === 'darwin') {
+        pythonCmd = path.join(pythonDistPath, 'start-backend.sh');
+        pythonArgs = [];
+        cwd = pythonDistPath;
+      } else {
+        pythonCmd = path.join(pythonDistPath, 'venv', 'bin', 'python');
+        pythonArgs = [path.join(pythonDistPath, 'launch.py')];
+        cwd = pythonDistPath;
+      }
     }
-  }
-  
-  console.log(`Starting Python backend: ${pythonCmd} ${pythonArgs.join(' ')}`);
-  
-  pythonProcess = spawn(pythonCmd, pythonArgs, {
-    cwd: cwd,
-    env: {
-      ...process.env,
-      PYTHONPATH: isDev ? 
-        path.join(__dirname, '..', 'backend') : 
-        path.join(cwd, 'backend')
-    }
-  });
+    
+    console.log(`[Backend] Starting: ${pythonCmd} ${pythonArgs.join(' ')} in ${cwd}`);
+    
+    pythonProcess = spawn(pythonCmd, pythonArgs, {
+      cwd: cwd,
+      env: {
+        ...process.env,
+        PYTHONPATH: isDev ? 
+          path.join(__dirname, '..', 'backend') : 
+          path.join(cwd, 'backend')
+      }
+    });
 
-  pythonProcess.stdout.on('data', (data) => {
-    console.log(`Python Backend: ${data}`);
-  });
+    let backendReady = false;
+    const startupTimeout = setTimeout(() => {
+      if (!backendReady) {
+        console.error('[Backend] Startup timeout. Killing process.');
+        pythonProcess.kill();
+        reject(new Error('Backend failed to start in time.'));
+      }
+    }, 20000); // 20 seconds
 
-  pythonProcess.stderr.on('data', (data) => {
-    console.error(`Python Backend Error: ${data}`);
-  });
+    pythonProcess.stdout.on('data', (data) => {
+      const output = data.toString();
+      console.log(`[Backend] ${output}`);
+      if (output.includes('Uvicorn running on')) {
+        backendReady = true;
+        clearTimeout(startupTimeout);
+        console.log('[Backend] Successfully started!');
+        resolve(true);
+      }
+    });
 
-  pythonProcess.on('close', (code) => {
-    console.log(`Python Backend exited with code ${code}`);
-  });
-  
-  pythonProcess.on('error', (error) => {
-    console.error(`Failed to start Python backend: ${error}`);
+    pythonProcess.stderr.on('data', (data) => {
+      const errorMsg = data.toString();
+      console.error(`[Backend] Error: ${errorMsg}`);
+      // Reject only on critical startup errors, not all stderr output
+      if (!backendReady && errorMsg.toLowerCase().includes('error')) {
+        clearTimeout(startupTimeout);
+        reject(new Error(`Backend failed to start: ${errorMsg}`));
+      }
+    });
+
+    pythonProcess.on('close', (code) => {
+      console.log(`[Backend] Exited with code ${code}`);
+      if (!backendReady) {
+        clearTimeout(startupTimeout);
+        reject(new Error(`Backend process exited prematurely with code ${code}`))}
+    });
+    
+    pythonProcess.on('error', (error) => {
+      console.error(`[Backend] Failed to start process: ${error}`);
+      clearTimeout(startupTimeout);
+      reject(error);
+    });
   });
 }
 
-app.whenReady().then(() => {
-  startPythonBackend();
-  createWindow();
+app.whenReady().then(async () => {
+  try {
+    await startPythonBackend();
+    createWindow();
+  } catch (error) {
+    console.error('App startup error:', error);
+    dialog.showErrorBox(
+      'Application Error',
+      `Failed to start the backend. Please check logs for details.\n\nError: ${error.message}`
+    );
+    app.quit();
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -99,6 +134,7 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (pythonProcess) {
+    console.log('[Backend] Killing backend process...');
     pythonProcess.kill();
   }
   if (process.platform !== 'darwin') {
@@ -106,7 +142,7 @@ app.on('window-all-closed', () => {
   }
 });
 
-// IPC handlers for file operations
+// IPC handlers
 ipcMain.handle('dialog:openFile', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openFile'],
@@ -118,7 +154,7 @@ ipcMain.handle('dialog:openFile', async () => {
   return result;
 });
 
-ipcMain.handle('dialog:saveFile', async (event, options) => {
+icpMain.handle('dialog:saveFile', async (event, options) => {
   const result = await dialog.showSaveDialog(mainWindow, options);
   return result;
 });

@@ -2,10 +2,16 @@
 Transcript Generator Module
 Creates podcast transcripts using Qwen2.5-14B model
 """
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 from mlx_lm import load, generate
 
-DEFAULT_MODEL = "mlx-community/Qwen2.5-14B-Instruct-4bit"
+# Model options based on available resources
+MODEL_OPTIONS = {
+    "small": "mlx-community/Qwen3-8B-4bit",
+    "medium": "mlx-community/Qwen3-32B-4bit",
+    "large": "mlx-community/Qwen3-72B-4bit"
+}
+DEFAULT_MODEL = MODEL_OPTIONS["medium"]
 
 SYSTEM_PROMPT = """
 You are the a world-class podcast writer, you have worked as a ghost writer for Joe Rogan, Lex Fridman, Ben Shapiro, Tim Ferris. 
@@ -35,8 +41,11 @@ IT SHOULD STRICTLY BE THE DIALOGUES
 """
 
 class TranscriptGenerator:
-    def __init__(self, model_name: str = DEFAULT_MODEL):
-        self.model_name = model_name
+    def __init__(self, model_name: str = DEFAULT_MODEL, model_size: Optional[str] = None):
+        if model_size and model_size in MODEL_OPTIONS:
+            self.model_name = MODEL_OPTIONS[model_size]
+        else:
+            self.model_name = model_name
         self.model = None
         self.tokenizer = None
     

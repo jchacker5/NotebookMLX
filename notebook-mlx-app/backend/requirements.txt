@@ -1,8 +1,9 @@
 # Core ML dependencies
 PyPDF2>=3.0.0
-mlx-lm==0.19.2
-mlx-audio>=0.0.1
-f5-tts-mlx>=0.2.5
+mlx-lm>=0.24.1
+mlx-audio>=0.1.0
+f5-tts-mlx>=0.3.0
+mlx-whisper>=0.2.0
 soundfile>=0.13.1
 librosa>=0.10.2
 pydub>=0.25.1

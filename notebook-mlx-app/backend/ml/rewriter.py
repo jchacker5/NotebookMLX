@@ -1,12 +1,13 @@
 """
 Rewriter Module
-Makes transcripts more dramatic using Qwen2.5-7B model
+Makes transcripts more dramatic using Qwen3-8B model
 """
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 import ast
 from mlx_lm import load, generate
 
-DEFAULT_MODEL = "mlx-community/Qwen2.5-7B-Instruct-4bit"
+DEFAULT_MODEL = "mlx-community/Qwen3-8B-4bit"
+DEFAULT_QUANTIZATION = "4bit"  # Options: "4bit", "8bit", None
 
 SYSTEM_PROMPT = """
 You are an Emmy-winning podcast editor renowned for your ability to transform good conversations into absolutely riveting audio experiences. Your superpower is taking natural dialogue and enhancing it with perfect timing, emotion, and those little human moments that make listeners feel like they're right there in the room.
@@ -30,8 +31,9 @@ IMPORTANT:
 """
 
 class Rewriter:
-    def __init__(self, model_name: str = DEFAULT_MODEL):
+    def __init__(self, model_name: str = DEFAULT_MODEL, quantization: Optional[str] = DEFAULT_QUANTIZATION):
         self.model_name = model_name
+        self.quantization = quantization
         self.model = None
         self.tokenizer = None
     

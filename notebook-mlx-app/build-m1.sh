@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd /Users/gijoe/Documents/NotebookMLX/notebook-mlx-app
+
 echo "🚀 Fast M1 Mac Build for NotebookMLX"
 echo "=================================="
 
@@ -9,19 +11,19 @@ rm -rf dist/ python-dist/
 
 # Build frontend
 echo "🔧 Building frontend..."
-cd frontend && npm run build && cd ..
+cd frontend && pnpm run build && cd ..
 
 # Prepare Python (reuse if exists)
 echo "🐍 Preparing Python distribution..."
 if [ ! -d "python-dist" ]; then
-    node scripts/prepare-python.js
+    node ../scripts/prepare-python.js
 else
     echo "✅ Using existing Python distribution"
 fi
 
 # Build just the .app (no DMG for speed)
 echo "📱 Building macOS app (ARM64 only)..."
-npx electron-builder --mac --arm64 --dir
+pnpm exec electron-builder --mac --arm64 --dir
 
 echo ""
 echo "🎉 Build Complete!"
@@ -42,7 +44,7 @@ if [ -d "$APP_PATH" ]; then
         echo "🎯 Opening NotebookMLX..."
         open "$APP_PATH"
     else
-        echo "💡 To run later: open \"$(pwd)/$APP_PATH\""
+        echo "💡 To run later: open "$(pwd)/$APP_PATH""
     fi
 else
     echo "❌ Build failed - app not found"

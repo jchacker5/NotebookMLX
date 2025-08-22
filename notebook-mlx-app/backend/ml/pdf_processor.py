@@ -8,7 +8,8 @@ import PyPDF2
 from mlx_lm import load, generate
 from tqdm import tqdm
 
-DEFAULT_MODEL = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
+DEFAULT_MODEL = "mlx-community/Qwen3-8B-4bit"
+DEFAULT_QUANTIZATION = "4bit"  # Options: "4bit", "8bit", None
 
 SYS_PROMPT = """
 You are a world class text pre-processor, here is the raw data from a PDF, please parse and return it in a way that is crispy and usable to send to a podcast writer.
@@ -30,15 +31,21 @@ Here is the text:
 """
 
 class PDFProcessor:
-    def __init__(self, model_name: str = DEFAULT_MODEL):
+    def __init__(self, model_name: str = DEFAULT_MODEL, quantization: Optional[str] = DEFAULT_QUANTIZATION):
         self.model_name = model_name
+        self.quantization = quantization
         self.model = None
         self.tokenizer = None
         
     def load_model(self):
         """Load the MLX model for text processing"""
         if self.model is None:
-            self.model, self.tokenizer = load(self.model_name)
+            # Adjust model name based on quantization
+            model_id = self.model_name
+            if self.quantization and not model_id.endswith(f"-{self.quantization}"):
+                model_id = model_id.replace("-4bit", "").replace("-8bit", "")
+                model_id = f"{model_id}-{self.quantization}"
+            self.model, self.tokenizer = load(model_id)
     
     def validate_pdf(self, file_path: str) -> bool:
         """Validate if the file is a valid PDF"""

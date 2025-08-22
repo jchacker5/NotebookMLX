@@ -1,10 +1,27 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { SourcesPanel } from './components/SourcesPanel'
 import { ChatPanel } from './components/ChatPanel'
 import { StudioPanel } from './components/StudioPanel'
+import { NotebooksPage } from './components/NotebooksPage'
 
 function App() {
-  const [activePanel, setActivePanel] = useState<'chat' | 'studio'>('chat')
+  const [activePanel] = useState<'chat' | 'studio'>('chat')
+  const [currentView, setCurrentView] = useState<'notebooks' | 'notebook'>('notebooks')
+  const [currentNotebookId, setCurrentNotebookId] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Check if we're viewing a specific notebook
+    const path = window.location.pathname
+    if (path.startsWith('/notebook/')) {
+      const id = path.split('/notebook/')[1]
+      setCurrentNotebookId(id)
+      setCurrentView('notebook')
+    }
+  }, [])
+
+  if (currentView === 'notebooks') {
+    return <NotebooksPage />
+  }
 
   return (
     <div className="flex h-screen bg-background text-foreground">
@@ -15,33 +32,6 @@ function App() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <header className="h-14 border-b border-border flex items-center px-6">
-          <h1 className="text-xl font-semibold">NotebookMLX</h1>
-          <div className="ml-auto flex gap-2">
-            <button
-              onClick={() => setActivePanel('chat')}
-              className={`px-4 py-1.5 rounded-md transition-colors ${
-                activePanel === 'chat'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-secondary'
-              }`}
-            >
-              Chat
-            </button>
-            <button
-              onClick={() => setActivePanel('studio')}
-              className={`px-4 py-1.5 rounded-md transition-colors ${
-                activePanel === 'studio'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-secondary'
-              }`}
-            >
-              Studio
-            </button>
-          </div>
-        </header>
-
         {/* Content */}
         <div className="flex-1 overflow-hidden">
           {activePanel === 'chat' ? (

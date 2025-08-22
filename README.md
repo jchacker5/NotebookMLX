@@ -2,6 +2,8 @@
 
 English | [简体中文](./zh_CN/README.md)
 
+[Contributor Guide: Repository Guidelines](AGENTS.md)
+
 > [meta-llama/NotebookLlama](https://github.com/meta-llama/llama-recipes/tree/main/recipes/quickstart/NotebookLlama)
 
 I ported [NotebookLlama](https://github.com/meta-llama/llama-recipes/tree/main/recipes/quickstart/NotebookLlama) and
