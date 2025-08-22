@@ -4,6 +4,16 @@ English | [简体中文](./zh_CN/README.md)
 
 [Contributor Guide: Repository Guidelines](AGENTS.md)
 
+## Documentation
+- Architecture: `docs/ARCHITECTURE.md`
+- Development: `docs/DEVELOPMENT.md`
+- Backend: `docs/BACKEND.md`
+- Frontend: `docs/FRONTEND.md`
+- Electron: `docs/ELECTRON.md`
+- Testing & CI: `docs/TESTING.md`
+- Operations: `docs/OPERATIONS.md`
+- Security: `docs/SECURITY.md`
+
 > [meta-llama/NotebookLlama](https://github.com/meta-llama/llama-recipes/tree/main/recipes/quickstart/NotebookLlama)
 
 I ported [NotebookLlama](https://github.com/meta-llama/llama-recipes/tree/main/recipes/quickstart/NotebookLlama) and
