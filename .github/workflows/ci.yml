@@ -45,3 +45,43 @@ jobs:
           DISABLE_ML_IMPORTS: '1'
         run: pytest
 
+  frontend-build:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: notebook-mlx-app/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Enable corepack (pnpm)
+        run: corepack enable
+      - name: Install deps
+        run: pnpm install --frozen-lockfile=false
+      - name: Type-check and build
+        run: pnpm run build
+
+  frontend-e2e:
+    name: Frontend E2E (Playwright)
+    runs-on: ubuntu-latest
+    needs: frontend-build
+    defaults:
+      run:
+        working-directory: notebook-mlx-app/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Enable corepack (pnpm)
+        run: corepack enable
+      - name: Install deps
+        run: pnpm install --frozen-lockfile=false
+      - name: Install Playwright browsers
+        uses: microsoft/playwright-github-action@v1
+      - name: Build
+        run: pnpm run build
+      - name: Run Playwright tests
+        run: pnpm run test:e2e
