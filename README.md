@@ -14,6 +14,12 @@ English | [简体中文](./zh_CN/README.md)
 - Operations: `docs/OPERATIONS.md`
 - Security: `docs/SECURITY.md`
 
+## Quick Start (Dev)
+- Backend: `cd notebook-mlx-app/backend && pip install -r requirements.txt && python3 main.py`
+- Frontend: `cd notebook-mlx-app/frontend && pnpm install && pnpm start`
+- Electron (all-in-one): `cd notebook-mlx-app && pnpm start`
+- Docker (backend): `docker compose up --build` (serves on `:8000`)
+
 > [meta-llama/NotebookLlama](https://github.com/meta-llama/llama-recipes/tree/main/recipes/quickstart/NotebookLlama)
 
 I ported [NotebookLlama](https://github.com/meta-llama/llama-recipes/tree/main/recipes/quickstart/NotebookLlama) and

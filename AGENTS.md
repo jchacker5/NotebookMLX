@@ -18,6 +18,8 @@
 - Frontend only: `cd notebook-mlx-app/frontend && pnpm start`
 - Backend only: `cd notebook-mlx-app/backend && uvicorn main:app --reload`
 - Production build (macOS): `cd notebook-mlx-app && pnpm run dist:mac`
+- Docker (backend): `docker compose up --build` (serves on `:8000`)
+  - Uses `BACKEND_DATA_DIR=/data` and includes a `/healthz` healthcheck.
 
 ## Coding Style & Naming Conventions
 - Python (backend):
@@ -34,6 +36,10 @@
   - Frontend: Vitest + React Testing Library with files `src/**/*.test.tsx`.
   - Keep sample fixtures under `tests/fixtures/` and mock model calls.
 
+## Tooling & CI
+- Pre-commit: configured with Black, Isort, Ruff, and Prettier (`.pre-commit-config.yaml`).
+- CI (GitHub Actions): lints (pre-commit), runs backend tests (coverage ≥80%), builds frontend, and runs Playwright E2E with HTML report artifacts.
+
 ## Commit & Pull Request Guidelines
 - Use concise, conventional commits; existing history mixes scopes + emojis, e.g.:
   - `✨ feat(backend): add PDF processor`
@@ -47,4 +53,3 @@
 - Do not commit secrets or large artifacts: `backend/.env`, `models/`, generated media under `backend/data/`.
 - macOS is required; Apple Silicon is recommended for MLX performance. Models download on first use.
 - Prefer environment variables for ports and paths; keep user data under `backend/data/`.
-

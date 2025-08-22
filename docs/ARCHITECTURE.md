@@ -13,8 +13,11 @@ Data Flow
 - Chat → `/api/chat` composes response (stub-friendly for CI) and returns lightweight citations.
 - Podcast → `/api/generate-podcast` generates transcripts (and audio when TTS is available) as a background task.
 - Electron ↔ Backend → Backend started by the main process; frontend fetches via HTTP. IPC only for OS dialogs.
+ - Large Files → `/api/upload-chunk` + `/api/merge-chunks` support chunked uploads; frontend switches to chunks for files ≥ 8MB.
 
 Observability
-- JSON logs with rotation at `data/app.log`.
+- JSON logs with rotation at `<BACKEND_DATA_DIR>/app.log`.
 - Prometheus metrics on `/metrics`; health on `/healthz`.
 
+Storage Location
+- `BACKEND_DATA_DIR` controls where the DB and media live. Electron sets this to the OS user data directory to avoid read-only paths when packaged.
