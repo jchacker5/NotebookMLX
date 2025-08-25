@@ -5,14 +5,30 @@ English | [简体中文](./zh_CN/README.md)
 [Contributor Guide: Repository Guidelines](AGENTS.md)
 
 ## Documentation
-- Architecture: `docs/ARCHITECTURE.md`
-- Development: `docs/DEVELOPMENT.md`
-- Backend: `docs/BACKEND.md`
-- Frontend: `docs/FRONTEND.md`
-- Electron: `docs/ELECTRON.md`
-- Testing & CI: `docs/TESTING.md`
-- Operations: `docs/OPERATIONS.md`
-- Security: `docs/SECURITY.md`
+
+### User Documentation
+- **[User Guide](docs/USER_GUIDE.md)** - Comprehensive guide for end users
+- **[Quick Start](QUICK_START.md)** - Get up and running in 5 minutes
+- **[Installation Guide](INSTALL.md)** - Detailed installation instructions
+
+### Developer Documentation
+- **[Developer Tutorial](docs/DEVELOPER_TUTORIAL.md)** - Complete development guide
+- **[API Documentation](docs/API.md)** - Comprehensive API reference
+- **[Component Documentation](docs/COMPONENTS.md)** - React component reference
+- **[Architecture Overview](docs/ARCHITECTURE.md)** - System design and architecture
+
+### Technical Documentation
+- **[Backend Guide](docs/BACKEND.md)** - FastAPI backend details
+- **[Frontend Guide](docs/FRONTEND.md)** - React frontend architecture
+- **[Electron Guide](docs/ELECTRON.md)** - Desktop app implementation
+- **[Performance Guide](docs/PERFORMANCE.md)** - Monitoring and optimization
+- **[Security Guide](docs/SECURITY.md)** - Security best practices
+- **[Testing Guide](docs/TESTING.md)** - Testing strategies and CI/CD
+- **[Operations Guide](docs/OPERATIONS.md)** - Deployment and maintenance
+
+### Standards and Guidelines
+- **[Documentation Standards](docs/DOCUMENTATION_STANDARDS.md)** - Writing and maintenance guidelines
+- **[Contributing Guidelines](AGENTS.md)** - How to contribute to the project
 
 ## Quick Start (Dev)
 - App dev (first time):

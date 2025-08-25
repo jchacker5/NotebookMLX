@@ -30,12 +30,25 @@ const App = memo(() => {
   const [showExport, setShowExport] = useState(false)
 
   useEffect(() => {
-    // Check if we're viewing a specific notebook
-    const path = window.location.pathname
-    if (path.startsWith('/notebook/')) {
-      setCurrentView('notebook')
-      // In a real app, fetch the notebook title here
-      setCurrentNotebookTitle('Machine Learning Research')
+    const handleLocationChange = () => {
+      const path = window.location.pathname
+      if (path.startsWith('/notebook/')) {
+        setCurrentView('notebook')
+        // In a real app, fetch the notebook title here
+        setCurrentNotebookTitle('Machine Learning Research')
+      } else {
+        setCurrentView('notebooks')
+      }
+    }
+
+    // Check initial location
+    handleLocationChange()
+
+    // Listen for popstate events (browser back/forward)
+    window.addEventListener('popstate', handleLocationChange)
+
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange)
     }
   }, [])
 

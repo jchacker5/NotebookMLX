@@ -10,7 +10,7 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'vite preview --port 4173 --host 127.0.0.1',
+    command: 'npx serve dist -s -p 4173',
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: true,
     stdout: 'ignore',

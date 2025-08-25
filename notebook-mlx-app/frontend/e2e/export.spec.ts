@@ -12,18 +12,21 @@ test('export modal triggers chat PDF request', async ({ page }) => {
     })
   })
 
-  // Navigate to root and then simulate notebook view
-  await page.goto('/')
+  // Navigate directly to notebook view
+  await page.goto('/notebook/1')
   
-  // Simulate navigation to notebook view
-  await page.evaluate(() => {
-    window.history.pushState({}, '', '/notebook/1')
-    // Trigger a popstate event to make the app react to the URL change
-    window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
-  })
+  // Debug: Take a screenshot to see what's happening
+  await page.screenshot({ path: 'debug-notebook-view.png' })
   
-  // Wait for the page to load the notebook view
-  await page.waitForTimeout(1000)
+  // Wait for the page to load completely
+  await page.waitForLoadState('networkidle')
+  
+  // Check what elements are visible
+  const pageContent = await page.textContent('body')
+  console.log('Page content includes:', pageContent?.substring(0, 200))
+  
+  // Wait for the chat panel to be visible
+  await page.waitForSelector('[data-testid="chat-export-button"]', { timeout: 10000 })
 
   // Open export modal via chat panel export button (using data-testid)
   await page.getByTestId('chat-export-button').click()
@@ -39,17 +42,11 @@ test('export modal triggers chat Markdown request', async ({ page }) => {
     called = true
     await route.fulfill({ status: 200, contentType: 'text/markdown', body: 'MD' })
   })
-  // Navigate to root and then simulate notebook view
-  await page.goto('/')
+  // Navigate directly to notebook view
+  await page.goto('/notebook/1')
   
-  // Simulate navigation to notebook view
-  await page.evaluate(() => {
-    window.history.pushState({}, '', '/notebook/1')
-    window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
-  })
-  
-  // Wait for the page to load the notebook view
-  await page.waitForTimeout(1000)
+  // Wait for the chat panel to be visible
+  await page.waitForSelector('[data-testid="chat-export-button"]', { timeout: 10000 })
   
   await page.getByTestId('chat-export-button').click()
   await page.getByTestId('export-chat-markdown-button').click()
@@ -62,17 +59,11 @@ test('export modal triggers chat HTML request and JSON download', async ({ page 
     htmlCalled = true
     await route.fulfill({ status: 200, contentType: 'text/html', body: '<html></html>' })
   })
-  // Navigate to root and then simulate notebook view
-  await page.goto('/')
+  // Navigate directly to notebook view
+  await page.goto('/notebook/1')
   
-  // Simulate navigation to notebook view
-  await page.evaluate(() => {
-    window.history.pushState({}, '', '/notebook/1')
-    window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
-  })
-  
-  // Wait for the page to load the notebook view
-  await page.waitForTimeout(1000)
+  // Wait for the chat panel to be visible
+  await page.waitForSelector('[data-testid="chat-export-button"]', { timeout: 10000 })
   
   await page.getByTestId('chat-export-button').click()
   await page.getByTestId('export-chat-html-button').click()
@@ -109,17 +100,11 @@ test('downloads pill appears and navigates to Downloads', async ({ page }) => {
     }
   })
 
-  // Navigate to root and then simulate notebook view
-  await page.goto('/')
+  // Navigate directly to notebook view
+  await page.goto('/notebook/1')
   
-  // Simulate navigation to notebook view
-  await page.evaluate(() => {
-    window.history.pushState({}, '', '/notebook/1')
-    window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
-  })
-  
-  // Wait for the page to load the notebook view
-  await page.waitForTimeout(1000)
+  // Wait for the chat panel to be visible
+  await page.waitForSelector('[data-testid="chat-export-button"]', { timeout: 10000 })
   
   // Switch to Studio panel first
   await page.getByRole('button', { name: /^Studio$/ }).click()
