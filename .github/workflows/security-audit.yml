@@ -1,0 +1,173 @@
+name: Security Audit & Compliance
+
+on:
+  schedule:
+    - cron: '0 2 * * 1'  # Weekly on Monday at 2 AM
+  push:
+    branches: [ main, master ]
+    paths:
+      - '**/requirements.txt'
+      - '**/package.json'
+      - '**/package-lock.json'
+      - '**/Dockerfile'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  dependency-audit:
+    name: Dependency Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install audit tools
+        run: |
+          npm install -g audit-ci
+          pip install safety bandit semgrep
+      
+      - name: NPM Security Audit
+        run: |
+          cd notebook-mlx-app/frontend
+          npm audit --audit-level=moderate --production
+          audit-ci --moderate
+      
+      - name: Python Security Audit
+        run: |
+          cd notebook-mlx-app/backend
+          safety check -r requirements.txt --json --output safety-report.json || true
+          bandit -r . -f json -o bandit-report.json || true
+      
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: |
+            notebook-mlx-app/backend/safety-report.json
+            notebook-mlx-app/backend/bandit-report.json
+
+  secrets-scan:
+    name: Secrets Detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Run TruffleHog OSS
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+
+  container-security:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build backend image
+        run: |
+          cd notebook-mlx-app/backend
+          docker build -t notebookmlx-backend:test .
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'notebookmlx-backend:test'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+      
+      - name: Docker Scout
+        if: github.event_name != 'pull_request'
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: notebookmlx-backend:test
+          only-severities: critical,high
+          exit-code: true
+
+  compliance-check:
+    name: GDPR & Privacy Compliance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check for PII data handling
+        run: |
+          echo "## Privacy Compliance Check" >> compliance-report.md
+          echo "Scanning for potential PII handling..." >> compliance-report.md
+          
+          # Check for common PII patterns
+          grep -r -i -n "email\|phone\|address\|ssn\|credit.*card" --include="*.py" --include="*.js" --include="*.ts" . || echo "No obvious PII patterns found" >> compliance-report.md
+          
+          # Check for data retention policies
+          if [ -f "PRIVACY.md" ]; then
+            echo "✅ Privacy policy found" >> compliance-report.md
+          else
+            echo "⚠️ Privacy policy not found" >> compliance-report.md
+          fi
+          
+          # Check for data encryption
+          grep -r -i -n "encrypt\|crypto\|hash" --include="*.py" . || echo "No encryption patterns found" >> compliance-report.md
+      
+      - name: Upload compliance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-report
+          path: compliance-report.md
+
+  license-compliance:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Install license checker
+        run: npm install -g license-checker
+      
+      - name: Check frontend licenses
+        run: |
+          cd notebook-mlx-app/frontend
+          npm ci
+          license-checker --json > frontend-licenses.json
+          license-checker --summary
+      
+      - name: Check Python licenses
+        run: |
+          pip install pip-licenses
+          cd notebook-mlx-app/backend
+          pip install -r requirements.txt
+          pip-licenses --format=json --output-file=backend-licenses.json
+      
+      - name: Upload license reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-reports
+          path: |
+            notebook-mlx-app/frontend/frontend-licenses.json
+            notebook-mlx-app/backend/backend-licenses.json

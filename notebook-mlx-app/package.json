@@ -1,0 +1,93 @@
+{
+  "name": "notebook-mlx-app",
+  "version": "1.0.0",
+  "description": "A local NotebookLM alternative with MLX models",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "concurrently \"pnpm run start:backend\" \"pnpm run start:frontend\" \"wait-on http://localhost:3000 && electron .\"",
+    "start:backend": "cd backend && python main.py",
+    "start:frontend": "cd frontend && pnpm start",
+    "build": "pnpm run build:frontend && pnpm run prepare:python",
+    "build:frontend": "cd frontend && pnpm run build",
+    "prepare:python": "node scripts/prepare-python.js",
+    "electron": "electron .",
+    "dist": "pnpm run build && electron-builder --mac --arm64",
+    "dist:mac": "pnpm run build && electron-builder --mac --arm64",
+    "dist:fast": "pnpm run build && electron-builder --mac --arm64 --publish=never",
+    "pack": "pnpm run build && electron-builder --dir --arm64",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "keywords": ["notebook", "mlx", "ai", "podcast", "tts"],
+  "author": "jchacker5",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.notebookmlx.app",
+    "productName": "NotebookMLX",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "assets/icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64"]
+        }
+      ],
+      "minimumSystemVersion": "10.15",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "assets/entitlements.mac.plist",
+      "entitlementsInherit": "assets/entitlements.mac.plist"
+    },
+    "dmg": {
+      "title": "NotebookMLX ${version}",
+      "icon": "assets/icon.icns",
+      "background": "assets/dmg-background.png",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220,
+          "type": "file"
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 380
+      }
+    },
+    "files": [
+      "electron/**/*",
+      "frontend/dist/**/*",
+      "python-dist/**/*",
+      "!backend/venv",
+      "!backend/__pycache__",
+      "!backend/.env",
+      "!**/node_modules",
+      "!**/.git",
+      "!models"
+    ],
+    "extraResources": [
+      {
+        "from": "python-dist",
+        "to": "python-dist"
+      }
+    ],
+    "afterPack": "scripts/after-pack.js",
+    "beforeBuild": "scripts/before-build.js"
+  }
+}

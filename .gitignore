@@ -82,6 +82,15 @@ target/
 profile_default/
 ipython_config.py
 
+# Project-specific ignores
+notebook-mlx-app/backend/data/
+notebook-mlx-app/frontend/dist/
+notebook-mlx-app/frontend/node_modules/
+node_modules/
+notebook-mlx-app/frontend/playwright-report/
+notebook-mlx-app/frontend/test-results/
+notebook-mlx-app/notebook-mlx-app.app/
+
 # pyenv
 #   For a library or package, you might want to ignore these files since the code is
 #   intended to run in multiple environments; otherwise, check them in:

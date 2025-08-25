@@ -1,0 +1,354 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  release:
+    types: [ published ]
+
+env:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+      
+      - name: Run Semgrep SAST
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/python
+            p/javascript
+      
+      - name: Dependency vulnerability scan (npm)
+        run: |
+          cd notebook-mlx-app/frontend
+          npm audit --audit-level=high
+      
+      - name: Python dependency scan (safety)
+        run: |
+          pip install safety
+          cd notebook-mlx-app/backend
+          safety check -r requirements.txt --json
+
+  lint:
+    name: Code Quality & Linting
+    runs-on: ubuntu-latest
+    needs: security-scan
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Install pre-commit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pre-commit
+      
+      - name: Run pre-commit
+        run: pre-commit run --all-files
+      
+      - name: Frontend linting
+        run: |
+          cd notebook-mlx-app/frontend
+          npm ci
+          npm run lint --if-present
+      
+      - name: Backend linting
+        run: |
+          cd notebook-mlx-app/backend
+          pip install flake8 black mypy
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          black --check .
+          mypy . --ignore-missing-imports || true
+
+  backend-tests:
+    name: Backend Tests & Coverage
+    runs-on: ubuntu-latest
+    needs: lint
+    defaults:
+      run:
+        working-directory: notebook-mlx-app/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov pytest-xdist pytest-mock fastapi uvicorn[standard] python-multipart aiofiles prometheus-client
+      
+      - name: Run tests with coverage
+        env:
+          DISABLE_ML_IMPORTS: '1'
+        run: |
+          pytest --cov=./ --cov-report=xml --cov-report=html --cov-fail-under=80 -n auto
+      
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: notebook-mlx-app/backend/coverage.xml
+          flags: backend
+          fail_ci_if_error: true
+
+  frontend-build:
+    name: Frontend Build & Test
+    runs-on: ubuntu-latest
+    needs: lint
+    defaults:
+      run:
+        working-directory: notebook-mlx-app/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Enable corepack (pnpm)
+        run: corepack enable
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile=false
+      
+      - name: Run unit tests
+        run: pnpm test --if-present
+      
+      - name: Type-check
+        run: pnpm run type-check --if-present
+      
+      - name: Build
+        run: pnpm run build
+      
+      - name: Bundle analysis
+        run: |
+          npx webpack-bundle-analyzer dist/assets/*.js --mode=static --report=bundle-report.html --no-open || echo "Bundle analysis not available"
+      
+      - name: Upload frontend dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: notebook-mlx-app/frontend/dist
+          if-no-files-found: error
+      
+      - name: Upload bundle report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bundle-analysis
+          path: notebook-mlx-app/frontend/bundle-report.html
+          if-no-files-found: ignore
+
+  frontend-e2e:
+    name: E2E Testing (Playwright)
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-build]
+    defaults:
+      run:
+        working-directory: notebook-mlx-app/frontend
+    strategy:
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Enable corepack (pnpm)
+        run: corepack enable
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile=false
+      
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      
+      - name: Download frontend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: notebook-mlx-app/frontend/dist
+      
+      - name: Run Playwright tests
+        env:
+          BROWSER: ${{ matrix.browser }}
+        run: pnpm exec playwright test --project=${{ matrix.browser }}
+      
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: notebook-mlx-app/frontend/playwright-report
+          if-no-files-found: warn
+
+  performance-testing:
+    name: Performance & Load Testing
+    runs-on: ubuntu-latest
+    needs: backend-tests
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Docker for backend
+        run: |
+          cd notebook-mlx-app
+          docker-compose up -d backend
+          docker-compose ps
+      
+      - name: Wait for backend to be ready
+        run: |
+          timeout 60 bash -c 'until curl -f http://localhost:8000/healthz; do sleep 2; done'
+      
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+      
+      - name: Run load tests
+        run: |
+          k6 run k6/load-test.js --out json=load-test-results.json
+      
+      - name: Upload load test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-results
+          path: load-test-results.json
+
+  build-desktop:
+    name: Build Desktop Applications
+    needs: [frontend-e2e, performance-testing]
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+        include:
+          - os: macos-latest
+            platform: mac
+            arch: arm64
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+          - os: windows-latest
+            platform: win
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Enable corepack (pnpm)
+        run: corepack enable
+      
+      - name: Download frontend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: notebook-mlx-app/frontend/dist
+      
+      - name: Install dependencies
+        run: |
+          cd notebook-mlx-app
+          pnpm install
+      
+      - name: Prepare Python distribution
+        run: |
+          cd notebook-mlx-app
+          node scripts/prepare-python.js
+      
+      - name: Build Electron app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false  # Disable code signing for CI
+        run: |
+          cd notebook-mlx-app
+          pnpm run dist:${{ matrix.platform }}
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            notebook-mlx-app/dist/*.dmg
+            notebook-mlx-app/dist/*.AppImage
+            notebook-mlx-app/dist/*.exe
+            notebook-mlx-app/dist/*.deb
+            notebook-mlx-app/dist/*.rpm
+          if-no-files-found: ignore
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: build-desktop
+    if: github.event_name == 'release'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Create release assets
+        run: |
+          cd artifacts
+          find . -name "*.dmg" -o -name "*.AppImage" -o -name "*.exe" -o -name "*.deb" -o -name "*.rpm" | while read file; do
+            echo "Found release asset: $file"
+          done
+      
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.AppImage
+            artifacts/**/*.exe
+            artifacts/**/*.deb
+            artifacts/**/*.rpm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
