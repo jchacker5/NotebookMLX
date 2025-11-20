@@ -53,7 +53,7 @@ class LocalVoiceService {
     try {
       // In a real Electron app, this would import the Python/MLX backend
       // For now, we'll use localStorage to simulate local storage
-      console.log('Initializing local MLX voice trainer...')
+      // Voice trainer initialization would happen here
     } catch (error) {
       console.error('Failed to initialize voice trainer:', error)
     }
@@ -203,6 +203,7 @@ class LocalVoiceService {
             const metadata = JSON.parse(this.fs.readFileSync(metadataPath, 'utf8'))
             voices.push(metadata)
           } catch (error) {
+            // Error reading voice metadata, skipping this voice
             console.error(`Error reading voice metadata for ${voiceDir}:`, error)
           }
         }
@@ -219,27 +220,27 @@ class LocalVoiceService {
    * Generate voice sample using trained voice
    */
   async generateVoiceSample(
-    voiceId: string, 
-    text: string, 
-    speed: number = 1.0
+    _voiceId: string,
+    _text: string,
+    _speed: number = 1.0
   ): Promise<string> {
     
     if (this.isElectron) {
       // Use local MLX voice generation with specified speed
       const outputPath = this.path.join(
-        this.os.homedir(), 
-        '.notebookmlx', 
-        'generated', 
+        this.os.homedir(),
+        '.notebookmlx',
+        'generated',
         `sample_${Date.now()}.wav`
       )
-      
-      console.log(`Generating voice sample at ${speed}x speed for voice ${voiceId}`)
-      
+
+      // Generating voice sample at ${speed}x speed for voice ${voiceId}
+
       await this.ensureDirectory(this.path.dirname(outputPath))
-      
+
       // In real implementation, this would call the MLX voice trainer
       // For now, simulate by copying a reference file
-      console.log(`Generating voice sample for ${voiceId}: "${text}"`)
+      // Generate: ${voiceId}, text: "${text}"
       
       return outputPath
     } else {
@@ -279,12 +280,12 @@ class LocalVoiceService {
       
       if (this.fs.existsSync(voicePath)) {
         // Create zip archive of voice model
-        const archiver = window.require('archiver')
-        const archive = archiver('zip', { zlib: { level: 9 } })
-        
+        // const archiver = window.require('archiver')
+        // const archive = archiver('zip', { zlib: { level: 9 } })
+
         // Implementation would create zip file with voice model data
-        console.log('Creating voice model archive:', voiceId, archive.pointer())
-        
+        // Creating voice model archive for: ${voiceId}
+
         // For now, return placeholder
         return new Blob(['voice model export'], { type: 'application/zip' })
       }

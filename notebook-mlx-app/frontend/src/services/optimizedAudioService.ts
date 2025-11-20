@@ -62,12 +62,12 @@ class OptimizedAudioService {
    */
   async generateOptimizedAudio(
     text: string,
-    voiceSettings: any,
+    _voiceSettings: any,
     onProgress?: (progress: AudioProgress) => void
   ): Promise<string> {
-    
-    const startTime = performance.now()
-    
+
+    // const _startTime = performance.now() // For performance tracking
+
     try {
       // Start immediate streaming response
       const audioId = `audio_${Date.now()}`
@@ -92,11 +92,11 @@ class OptimizedAudioService {
       this.streamingCache.set(audioId, streamingData)
       
       // Simulate optimized audio generation with streaming
-      await this.simulateOptimizedGeneration(audioId, text, voiceSettings, onProgress)
-      
-      const endTime = performance.now()
-      console.log(`Audio generated in ${endTime - startTime}ms (95% faster than traditional loading)`)
-      
+      await this.simulateOptimizedGeneration(audioId, text, _voiceSettings, onProgress)
+
+      // Audio generation complete
+      // Time: ${performance.now() - startTime}ms (95% faster than traditional loading)
+
       return audioId
       
     } catch (error) {
@@ -157,16 +157,16 @@ class OptimizedAudioService {
   private async generateAudioChunk(
     chunkIndex: number,
     totalChunks: number,
-    voiceSettings: any
+    _voiceSettings: any
   ): Promise<ArrayBuffer> {
     
     // Simulate chunk generation with variable quality based on adaptive bitrate
     const adaptiveBitrate = this.config.adaptiveBitrate
     const quality = adaptiveBitrate ? this.calculateAdaptiveQuality(chunkIndex, totalChunks) : 1.0
-    
+
     // Use voice settings for generation (placeholder implementation)
-    console.log('Generating audio chunk with settings:', voiceSettings, 'quality:', quality)
-    
+    // Settings: voiceSettings, quality: quality
+
     // Generate synthetic audio data (in real implementation, this would call MLX TTS)
     const chunkDuration = 0.1 // 100ms chunks
     const sampleRate = 24000

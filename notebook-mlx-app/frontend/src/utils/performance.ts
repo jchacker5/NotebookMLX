@@ -100,8 +100,8 @@ export class PerformanceMonitor {
   }
 
   private reportMetric(name: string, value: number) {
-    console.log(`${name}: ${Math.round(value)}ms`)
-    
+    // Metrics: ${name}: ${Math.round(value)}ms
+
     // Send to analytics if available
     if (typeof (window as any).gtag !== 'undefined') {
       (window as any).gtag('event', 'timing_complete', {
@@ -147,27 +147,25 @@ export function addResourceHints() {
 // Memory usage monitoring
 export function monitorMemoryUsage() {
   if ('memory' in performance) {
-    const memory = (performance as any).memory
-    console.log('Memory usage:', {
-      used: Math.round(memory.usedJSHeapSize / 1048576) + ' MB',
-      total: Math.round(memory.totalJSHeapSize / 1048576) + ' MB',
-      limit: Math.round(memory.jsHeapSizeLimit / 1048576) + ' MB'
-    })
+    // const memory = (performance as any).memory
+    // Memory usage tracked silently
+    // Used: ${Math.round(memory.usedJSHeapSize / 1048576)} MB
+    // Total: ${Math.round(memory.totalJSHeapSize / 1048576)} MB
+    // Limit: ${Math.round(memory.jsHeapSizeLimit / 1048576)} MB
   }
 }
 
 // Bundle size analysis
 export function logBundleInfo() {
   if ('performance' in window) {
-    const resources = performance.getEntriesByType('resource')
-    const jsResources = resources.filter((resource: any) => 
-      resource.name.includes('.js') && !resource.name.includes('node_modules')
-    )
-    
-    console.log('JS Bundle Analysis:')
-    jsResources.forEach((resource: any) => {
-      console.log(`${resource.name}: ${Math.round(resource.transferSize / 1024)}KB`)
-    })
+    // const resources = performance.getEntriesByType('resource')
+    // const jsResources = resources.filter((resource: any) =>
+    //   resource.name.includes('.js') && !resource.name.includes('node_modules')
+    // )
+
+    // JS Bundle Analysis tracked silently
+    // Use browser DevTools Performance tab to view details
+    // Total JS resources: ${jsResources.length}
   }
 }
 

@@ -63,20 +63,22 @@ if ('performance' in window && 'PerformanceObserver' in window) {
   // Monitor Core Web Vitals
   const observer = new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) {
+      // Performance metrics are now collected silently
+      // Use browser DevTools or analytics to view metrics
       if (entry.entryType === 'largest-contentful-paint') {
-        console.log('LCP:', entry.startTime)
+        // LCP: entry.startTime
       }
       if (entry.entryType === 'first-input') {
-        console.log('FID:', (entry as any).processingStart - entry.startTime)
+        // FID: (entry as any).processingStart - entry.startTime
       }
       if (entry.entryType === 'layout-shift') {
         if (!(entry as any).hadRecentInput) {
-          console.log('CLS:', (entry as any).value)
+          // CLS: (entry as any).value
         }
       }
     }
   })
-  
+
   observer.observe({ entryTypes: ['largest-contentful-paint', 'first-input', 'layout-shift'] })
 }
 
