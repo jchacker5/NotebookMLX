@@ -8,6 +8,12 @@ interface HeaderProps {
 }
 
 export function Header({ title, onBack, showBack = false, onExport }: HeaderProps) {
+  const handleHelpClick = () => {
+    // Open user guide in a new tab
+    // In production, this could point to hosted documentation
+    window.open('https://github.com/jchacker5/NotebookMLX/blob/main/docs/USER_GUIDE.md', '_blank')
+  }
+
   return (
     <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6">
       <div className="flex items-center space-x-4">
@@ -33,7 +39,11 @@ export function Header({ title, onBack, showBack = false, onExport }: HeaderProp
             <span>Export</span>
           </button>
         )}
-        <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+        <button
+          onClick={handleHelpClick}
+          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          title="Open User Guide"
+        >
           <HelpCircle className="h-5 w-5 text-gray-600" />
         </button>
         <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
