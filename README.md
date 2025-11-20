@@ -10,6 +10,10 @@ English | [简体中文](./zh_CN/README.md)
 - **[User Guide](docs/USER_GUIDE.md)** - Comprehensive guide for end users
 - **[Quick Start](QUICK_START.md)** - Get up and running in 5 minutes
 - **[Installation Guide](INSTALL.md)** - Detailed installation instructions
+- **[FAQ](FAQ.md)** - Frequently asked questions and answers
+- **[Troubleshooting](TROUBLESHOOTING.md)** - Step-by-step diagnostic procedures
+- **[Support](SUPPORT.md)** - How to get help and report issues
+- **[Changelog](CHANGELOG.md)** - Version history and release notes
 
 ### Developer Documentation
 - **[Developer Tutorial](docs/DEVELOPER_TUTORIAL.md)** - Complete development guide

@@ -3,6 +3,7 @@ Simple database module using SQLite
 """
 import sqlite3
 import json
+import logging
 from typing import List, Dict, Optional
 from datetime import datetime
 import threading
@@ -29,6 +30,10 @@ class Database:
         cursor.execute("PRAGMA journal_mode=WAL;")
         cursor.execute("PRAGMA synchronous=NORMAL;")
         cursor.execute("PRAGMA busy_timeout=5000;")
+
+        # Configure WAL checkpointing
+        cursor.execute("PRAGMA wal_autocheckpoint=1000;")
+        cursor.execute("PRAGMA journal_size_limit=67108864;")  # 64MB limit
         
         # Sources table
         cursor.execute("""
@@ -66,8 +71,31 @@ class Database:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
+
+        # Add indexes for performance
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_sources_created
+            ON sources(created_at DESC)
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_tasks_status
+            ON tasks(status, updated_at DESC)
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_tasks_type
+            ON tasks(type, created_at DESC)
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_voices_created
+            ON voices(created_at DESC)
+        """)
+
         conn.commit()
+        logger = logging.getLogger("notebookmlx")
+        logger.info("Database initialized with indexes and WAL checkpointing")
     
     def add_source(self, source: Dict) -> str:
         """Add a new source to the database"""
