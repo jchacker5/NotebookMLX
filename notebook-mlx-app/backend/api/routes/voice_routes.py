@@ -23,6 +23,23 @@ class VoiceListResponse(BaseModel):
 
 tts_engine = TTSEngine()
 
+# Path traversal prevention for voice operations
+def validate_voice_id(voice_id: str) -> str:
+    """Validate and sanitize voice_id to prevent path traversal"""
+    import re
+    from pathlib import Path
+    
+    if not re.match(r"^[a-zA-Z0-9_-]{1,64}$", voice_id):
+        raise HTTPException(status_code=400, detail="Invalid voice_id format")
+    
+    base_path = Path("data/voices").resolve()
+    voice_path = (base_path / voice_id).resolve()
+    
+    if not str(voice_path).startswith(str(base_path)):
+        raise HTTPException(status_code=400, detail="Access denied")
+    
+    return str(voice_path)
+
 @router.post("/train")
 async def train_voice(
     voice_name: str = Form(...),
@@ -125,7 +142,7 @@ async def list_voices():
 async def delete_voice(voice_id: str):
     """Delete a custom trained voice"""
     
-    voice_path = os.path.join("data/voices", voice_id)
+    voice_path = validate_voice_id(voice_id)
     
     if not os.path.exists(voice_path):
         raise HTTPException(status_code=404, detail="Voice not found")
@@ -146,7 +163,7 @@ async def delete_voice(voice_id: str):
 async def download_voice(voice_id: str):
     """Download a custom voice model"""
     
-    voice_path = os.path.join("data/voices", voice_id)
+    voice_path = validate_voice_id(voice_id)
     metadata_path = os.path.join(voice_path, "metadata.json")
     
     if not os.path.exists(metadata_path):
@@ -220,7 +237,7 @@ async def generate_voice_sample(
 async def get_voice_info(voice_id: str):
     """Get detailed information about a specific voice"""
     
-    voice_path = os.path.join("data/voices", voice_id)
+    voice_path = validate_voice_id(voice_id)
     metadata_path = os.path.join(voice_path, "metadata.json")
     
     if not os.path.exists(metadata_path):

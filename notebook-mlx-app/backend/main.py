@@ -4,6 +4,7 @@ FastAPI Backend Server for NotebookMLX App
 import os
 import uuid
 import asyncio
+import shutil
 from typing import List, Optional
 from datetime import datetime
 from pathlib import Path
@@ -19,8 +20,9 @@ import logging
 from logging.handlers import RotatingFileHandler
 import json
 import time
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 from reportlab.lib.pagesizes import letter
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 import base64
@@ -86,6 +88,36 @@ logger.setLevel(logging.INFO)
 REQ_COUNT = Counter("http_requests_total", "Total HTTP requests", ["method", "path", "status"])
 REQ_LATENCY = Histogram("http_request_duration_seconds", "Request latency", ["method", "path"])
 
+# Business metrics
+PODCAST_GENERATIONS = Counter(
+    'podcast_generations_total',
+    'Total podcast generations',
+    ['status']  # success, failed
+)
+
+PODCAST_DURATION = Histogram(
+    'podcast_generation_seconds',
+    'Podcast generation duration',
+    buckets=[10, 30, 60, 120, 300, 600, 1800]
+)
+
+FILE_UPLOADS = Counter(
+    'file_uploads_total',
+    'Total file uploads',
+    ['file_type', 'status']
+)
+
+ACTIVE_TASKS = Gauge(
+    'active_background_tasks',
+    'Number of active background tasks'
+)
+
+DISK_USAGE = Gauge(
+    'disk_usage_bytes',
+    'Disk usage by directory',
+    ['directory']
+)
+
 
 @app.middleware("http")
 async def add_observability(request: Request, call_next):
@@ -119,6 +151,54 @@ data_dir = os.getenv("BACKEND_DATA_DIR", "data")
 Path(data_dir).mkdir(parents=True, exist_ok=True)
 db = Database(db_path=str(Path(data_dir) / "notebookmlx.db"))
 file_manager = FileManager(base_path=data_dir)
+
+# Initialize scheduler for background jobs
+scheduler = AsyncIOScheduler()
+
+def update_disk_metrics():
+    """Update disk usage metrics"""
+    for directory in ['podcasts', 'uploads', 'tts', 'voices', 'exports', 'uploads/chunks']:
+        path = Path(f"{data_dir}/{directory}")
+        if path.exists():
+            size = sum(f.stat().st_size for f in path.rglob('*') if f.is_file())
+            DISK_USAGE.labels(directory=directory).set(size)
+
+# Schedule cleanup jobs
+scheduler.add_job(
+    lambda: file_manager.cleanup_old_files('podcasts', days=7),
+    'interval',
+    hours=24,
+    id='cleanup_podcasts'
+)
+
+scheduler.add_job(
+    lambda: file_manager.cleanup_old_files('tts', days=1),
+    'interval',
+    hours=6,
+    id='cleanup_tts'
+)
+
+scheduler.add_job(
+    lambda: file_manager.cleanup_old_files('uploads/chunks', days=1),
+    'interval',
+    hours=12,
+    id='cleanup_chunks'
+)
+
+scheduler.add_job(
+    lambda: file_manager.cleanup_old_files('exports', days=3),
+    'interval',
+    hours=24,
+    id='cleanup_exports'
+)
+
+# Schedule metrics updates
+scheduler.add_job(
+    update_disk_metrics,
+    'interval',
+    minutes=5,
+    id='update_metrics'
+)
 
 # Lazy initialization of ML models to improve startup time
 pdf_processor = None
@@ -244,6 +324,25 @@ async def unblock_ip_after_delay(ip: str, delay_seconds: int):
     await asyncio.sleep(delay_seconds)
     _blocked_ips.discard(ip)
     _failed_attempts.pop(ip, None)
+# Safe error response handler
+def safe_error_response(e: Exception, status_code: int = 500, user_message: str = None) -> HTTPException:
+    """Log error details, return safe message to user"""
+    logger.error(f"Internal error: {e}", exc_info=True)
+    
+    # Expected errors - safe to expose
+    if isinstance(e, ValueError):
+        return HTTPException(status_code=400, detail=str(e))
+    
+    if isinstance(e, FileNotFoundError):
+        return HTTPException(status_code=404, detail="Resource not found")
+    
+    if isinstance(e, PermissionError):
+        return HTTPException(status_code=403, detail="Access denied")
+    
+    # Unexpected errors - hide details
+    message = user_message or "An internal error occurred. Please try again or contact support."
+    return HTTPException(status_code=status_code, detail=message)
+
 
 # Pydantic models
 class ChatRequest(BaseModel):
@@ -295,9 +394,80 @@ async def root():
     return {"message": "NotebookMLX API is running"}
 
 
+@app.get("/healthz/live")
+async def liveness():
+    """Liveness probe - is the service running?"""
+    return {"status": "ok"}
+
+
+@app.get("/healthz/ready")
+async def readiness():
+    """Readiness probe - can the service handle requests?"""
+    checks = {}
+
+    # Check database
+    try:
+        db_test = Database(db_path=str(Path(data_dir) / "notebookmlx.db"))
+        conn = db_test._get_conn()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        checks["database"] = True
+    except Exception as e:
+        logger.error(f"Database health check failed: {e}")
+        checks["database"] = False
+
+    # Check disk space (need at least 10% free)
+    try:
+        stat = shutil.disk_usage(Path(data_dir))
+        free_percent = (stat.free / stat.total) * 100
+        checks["disk_space"] = free_percent > 10
+        checks["disk_free_percent"] = round(free_percent, 2)
+    except Exception as e:
+        logger.error(f"Disk check failed: {e}")
+        checks["disk_space"] = False
+
+    # Check data directory writable
+    try:
+        test_file = Path(data_dir) / ".health_check"
+        test_file.write_text("ok")
+        test_file.unlink()
+        checks["data_writable"] = True
+    except Exception as e:
+        logger.error(f"Write check failed: {e}")
+        checks["data_writable"] = False
+
+    # Overall status
+    all_healthy = all([
+        checks.get("database", False),
+        checks.get("disk_space", False),
+        checks.get("data_writable", False)
+    ])
+
+    if all_healthy:
+        return {"status": "ready", "checks": checks}
+    else:
+        raise HTTPException(status_code=503, detail={"status": "not_ready", "checks": checks})
+
+
 @app.get("/healthz")
 async def healthz():
-    return {"status": "ok"}
+    """Legacy health check endpoint"""
+    return await liveness()
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Start scheduler and run initial tasks"""
+    scheduler.start()
+    update_disk_metrics()  # Initial metrics update
+    logger.info("File cleanup scheduler started")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Gracefully shutdown scheduler"""
+    scheduler.shutdown()
+    logger.info("File cleanup scheduler stopped")
 
 
 @app.get("/metrics")
@@ -350,7 +520,7 @@ async def export_chat_pdf(payload: ChatExportRequest, request: Request):
         filename = f"chat_export_{uuid.uuid4().hex[:8]}.pdf"
         return FileResponse(tmp_path, filename=filename, media_type="application/pdf")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise safe_error_response(e)
 
 
 @app.post("/api/export/chat-html")
@@ -372,7 +542,7 @@ async def export_chat_html(payload: ChatExportRequest, request: Request):
         filename = f"chat_export_{uuid.uuid4().hex[:8]}.html"
         return FileResponse(tmp_path, filename=filename, media_type="text/html; charset=utf-8")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise safe_error_response(e)
 
 
 @app.post("/api/export/chat-md")
@@ -393,7 +563,7 @@ async def export_chat_md(payload: ChatExportRequest, request: Request):
         filename = f"chat_export_{uuid.uuid4().hex[:8]}.md"
         return FileResponse(tmp_path, filename=filename, media_type="text/markdown; charset=utf-8")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise safe_error_response(e)
 
 
 @app.get("/api/export/podcast/{task_id}.zip")
@@ -485,7 +655,7 @@ async def export_podcast_zip(task_id: str, request: Request):
         filename = f"podcast_{task_id}.zip"
         return FileResponse(tmp_zip, filename=filename, media_type="application/zip")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise safe_error_response(e)
 
 
 @app.get("/api/export/podcast/{task_id}/segments.json")
@@ -505,7 +675,7 @@ async def export_podcast_segments(task_id: str, request: Request):
     return JSONResponse(content=payload)
 
 @app.post("/api/upload-source")
-async def upload_source(file: UploadFile = File(...)):
+async def upload_source(file: UploadFile = File(...), request: Request = None):
     """Upload and process a source file"""
     try:
         # Save uploaded file
@@ -640,15 +810,23 @@ async def upload_source(file: UploadFile = File(...)):
                 "processed_text": content,
                 "created_at": datetime.now()
             })
-        
+
+        # Track successful upload
+        FILE_UPLOADS.labels(file_type=ext, status='success').inc()
+
         return {
             "source_id": source_id,
             "filename": file.filename,
             "status": "processed"
         }
-        
+
+    except HTTPException:
+        # Track failed upload
+        FILE_UPLOADS.labels(file_type=Path(file.filename).suffix.lower(), status='failed').inc()
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        FILE_UPLOADS.labels(file_type=Path(file.filename).suffix.lower(), status='failed').inc()
+        raise safe_error_response(e)
 
 
 @app.post("/api/upload-chunk")
@@ -680,7 +858,7 @@ async def upload_chunk(
             raise HTTPException(status_code=413, detail=f"Upload too large in total. Max {max_total_mb}MB")
         return {"status": "ok"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise safe_error_response(e)
 
 
 @app.post("/api/merge-chunks")
@@ -745,7 +923,7 @@ async def merge_chunks(file_id: str = Form(...), filename: str = Form(...)):
             })
         return {"source_id": source_id, "filename": filename, "status": "processed"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise safe_error_response(e)
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_with_sources(request: ChatRequest):
@@ -775,7 +953,7 @@ async def chat_with_sources(request: ChatRequest):
         return ChatResponse(response=response_text, citations=citations)
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise safe_error_response(e)
 
 @app.post("/api/generate-podcast")
 async def generate_podcast(request: PodcastRequest, background_tasks: BackgroundTasks):
@@ -811,13 +989,16 @@ async def generate_podcast(request: PodcastRequest, background_tasks: Background
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise safe_error_response(e)
 
 _GEN_SEMAPHORE = asyncio.Semaphore(int(os.getenv("GEN_CONCURRENCY", "2")))
 
 
 async def generate_podcast_task(task_id: str, text: str, voice1: str, voice2: str, enhance: bool):
     """Background task for podcast generation"""
+    start_time = time.time()
+    ACTIVE_TASKS.inc()  # Track active task
+
     try:
         # Add task to database first
         db.add_task({
@@ -825,7 +1006,7 @@ async def generate_podcast_task(task_id: str, text: str, voice1: str, voice2: st
             "type": "podcast_generation",
             "status": "generating_transcript"
         })
-        
+
         async with _GEN_SEMAPHORE:
             # Generate transcript
             transcript = get_transcript_generator().generate_transcript(text)
@@ -858,9 +1039,17 @@ async def generate_podcast_task(task_id: str, text: str, voice1: str, voice2: st
                 "transcript": segments,
                 "message": "TTS not available in this build"
             })
-        
+
+        # Track successful generation
+        duration = time.time() - start_time
+        PODCAST_GENERATIONS.labels(status='success').inc()
+        PODCAST_DURATION.observe(duration)
+
     except Exception as e:
         db.update_task(task_id, {"status": "failed", "error": str(e)})
+        PODCAST_GENERATIONS.labels(status='failed').inc()
+    finally:
+        ACTIVE_TASKS.dec()  # Task completed
 
 @app.get("/api/task/{task_id}")
 async def get_task_status(task_id: str):
@@ -907,7 +1096,7 @@ async def generate_mindmap(request: MindMapRequest):
         return mindmap_data
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise safe_error_response(e)
 
 @app.post("/api/synthesize-voice")
 async def synthesize_voice(request: VoiceSynthRequest):
@@ -931,14 +1120,18 @@ async def synthesize_voice(request: VoiceSynthRequest):
         return FileResponse(audio_path, media_type="audio/wav")
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise safe_error_response(e)
 
 @app.post("/api/train-voice", response_model=TrainVoiceResponse)
 async def train_voice(
     voice_name: str,
-    audio_files: List[UploadFile] = File(...)
+    audio_files: List[UploadFile] = File(...),
+    request: Request = None
 ):
     """Train a custom voice model"""
+    # Add rate limiting - training is expensive
+    check_rate_limit(request, key='voice_training', limit_per_min=2, burst_limit=1)
+
     try:
         tts = get_tts_engine()
         if tts is None:
@@ -955,7 +1148,7 @@ async def train_voice(
         return TrainVoiceResponse(**result)
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise safe_error_response(e)
 
 @app.get("/api/download/{file_type}/{file_id}")
 async def download_file(file_type: str, file_id: str):
