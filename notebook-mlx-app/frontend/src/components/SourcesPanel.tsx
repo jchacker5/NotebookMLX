@@ -11,7 +11,7 @@ export function SourcesPanel() {
   const { notify } = useToast()
 
   const uploadMutation = useMutation({
-    mutationFn: uploadSource,
+    mutationFn: (file: File) => uploadSource(file),
     onSuccess: (data) => {
       addSource({
         id: data.source_id,
